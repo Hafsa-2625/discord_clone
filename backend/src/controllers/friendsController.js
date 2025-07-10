@@ -62,7 +62,8 @@ exports.getFriends = async (req, res) => {
   const result = friendUsers.map(u => ({
     id: u.id,
     name: u.name,
-    status: 'offline', 
+    status: 'offline',
+    createdAt: u.createdAt,
   }));
   res.json(result);
 }; 
