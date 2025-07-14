@@ -1,6 +1,6 @@
 const { drizzle } = require('drizzle-orm/node-postgres');
 const { Pool } = require('pg');
-const { users, friendRequests, friends, messages, messageSessions } = require('./schema');
+const { users, friendRequests, friends, messages, messageSessions, dmAttachments, groupDMSessions, groupDMMembers } = require('./schema');
 require('dotenv').config();
 
 const pool = new Pool({
@@ -9,4 +9,4 @@ const pool = new Pool({
 
 const db = drizzle(pool);
 
-module.exports = { db, users, friendRequests, friends, messages, messageSessions };
+module.exports = { db, users, friendRequests, friends, messages, messageSessions, dmAttachments, groupDMSessions, groupDMMembers };

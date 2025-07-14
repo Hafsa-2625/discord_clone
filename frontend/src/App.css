@@ -1,8 +1,14 @@
-#root {
-  /* max-width: 1280px; */
-  /* margin: 0 auto; */
-  /* padding: 2rem; */
-  /* text-align: center; */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* IE 10+ */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+html, body, #root {
+  min-height: 100vh;
+  background: #313338;
 }
 
 .logo {

@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 import Login from "./pages/Auth/Login";
 import Register from "./pages/Auth/Register";
 import Home from "./pages/Home/Home";
+import Settings from "./pages/Settings/Settings";
+import ServerPage from "./pages/Server/ServerPage";
+import ChannelPage from "./pages/Server/ChannelPage";
+
 import "./App.css";
 
 function LandingPage() {
@@ -74,6 +78,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/home" element={<PrivateRoute><Home /></PrivateRoute>} />
+        <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+        <Route path="/server/:id" element={<PrivateRoute><ServerPage /></PrivateRoute>}>
+          <Route path="channel/:channelId" element={<ChannelPage />} />
+        </Route>
       </Routes>
     </Router>
   );
