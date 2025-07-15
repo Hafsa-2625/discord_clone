@@ -40,6 +40,13 @@ export default function Home() {
   const [groupDMs, setGroupDMs] = useState<any[]>([]); // [{ id, name, imageUrl, members: [] }]
   const [activeGroupDM, setActiveGroupDM] = useState<any | null>(null);
 
+  // DM specific states
+  const [dmMessages, setDmMessages] = useState<{senderId: string, message: string, createdAt?: string}[]>([]);
+  const [dmNewMessage, setDmNewMessage] = useState('');
+  // Group DM specific states
+  const [groupMessages, setGroupMessages] = useState<{senderId: string, message: string, createdAt?: string}[]>([]);
+  const [groupNewMessage, setGroupNewMessage] = useState('');
+
   // Fetches the current user's friends list when the active tab is 'all'.
   useEffect(() => {
     if (activeTab === "all") {
@@ -206,14 +213,21 @@ export default function Home() {
     setActiveChat(null); // Deselect 1:1 DM
   };
 
+  // Handler for selecting a DM from DirectMessages
+  const handleSelectDM = (chat: {id: string, name: string}) => {
+    setActiveChat(chat);
+    setActiveGroupDM(null); // Deselect group DM
+  };
+
   const maxSelectable = 9;
 
   return (
     <div className="flex min-h-screen bg-[#313338] text-white">
       <Sidebar onAddServer={() => setShowAddServerModal(true)} />
       {/* Friends/DMs Panel */}
-      <nav className="w-72 bg-[#23272a] flex flex-col py-4 px-2 border-r border-[#23272a] justify-between" style={{ minHeight: '100vh' }}>
-        <div>
+      <nav className="h-screen flex flex-col w-72 bg-[#23272a] py-4 px-2 border-r border-[#23272a] justify-between">
+        {/* Scrollable area for DMs and group DMs */}
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
           {/* Top Friends/DMs section */}
           <div className="flex items-center gap-2 mb-4">
             <Users size={20} className="cursor-pointer" />
@@ -228,7 +242,7 @@ export default function Home() {
           {groupDMs.length > 0 && (
             <>
               <div className="text-xs text-gray-400 mt-4 mb-1">Group DMs</div>
-              <div className="flex flex-col gap-2 flex-1 overflow-y-auto mb-2">
+              <div className="flex flex-col gap-2 mb-2">
                 {groupDMs.map(gdm => (
                   <div
                     key={gdm.id}
@@ -247,11 +261,11 @@ export default function Home() {
           )}
           <DirectMessages
             dmList={dmList}
-            setActiveChat={setActiveChat}
+            setActiveChat={handleSelectDM}
             user={user}
             friends={friends}
             socketRef={socketRef}
-            setMessages={setMessages}
+            setMessages={setDmMessages}
             setDmList={setDmList}
           />
         </div>
@@ -264,15 +278,17 @@ export default function Home() {
         />
       </nav>
       {/* Main Content */}
-      <main className="flex-1 flex flex-col">
-        <Navbar activeTab={activeTab} setActiveTab={setActiveTab}>
-          <div className="flex items-center gap-2">
-            {/* <Search size={20} className="text-gray-400" /> */}
-            <Button variant="secondary" className="flex items-center gap-2" onClick={handleCreateGroupDM}>
-              <UserPlus size={18} /> New Group DM
-            </Button>
-          </div>
-        </Navbar>
+      <main className="flex-1 flex flex-col h-[100vh] min-h-0">
+        {!(activeChat || activeGroupDM) && (
+          <Navbar activeTab={activeTab} setActiveTab={setActiveTab}>
+            <div className="flex items-center gap-2">
+              {/* <Search size={20} className="text-gray-400" /> */}
+              <Button variant="secondary" className="flex items-center gap-2" onClick={handleCreateGroupDM}>
+                <UserPlus size={18} /> New Group DM
+              </Button>
+            </div>
+          </Navbar>
+        )}
         <GroupDMModal
           open={showGroupDmModal}
           onClose={handleCloseGroupDmModal}
@@ -281,16 +297,26 @@ export default function Home() {
         />
         {/* Main Content Area */}
         {activeGroupDM ? (
-          <GroupDMChatWindow group={activeGroupDM} members={activeGroupDM.members || []} />
+          <GroupDMChatWindow
+            group={activeGroupDM}
+            members={activeGroupDM.members || []}
+            onClose={() => { setActiveGroupDM(null); setActiveTab('all'); }}
+            messages={groupMessages}
+            newMessage={groupNewMessage}
+            setNewMessage={setGroupNewMessage}
+            user={{ id: user.id, name: user.name || 'You' }}
+            socketRef={socketRef}
+            setMessages={setGroupMessages}
+          />
         ) : activeChat ? (
           <ChatWindow
             activeChat={activeChat}
-            messages={messages}
-            newMessage={newMessage}
-            setNewMessage={setNewMessage}
+            messages={dmMessages}
+            newMessage={dmNewMessage}
+            setNewMessage={setDmNewMessage}
             user={user}
             socketRef={socketRef}
-            setMessages={setMessages}
+            setMessages={setDmMessages}
             dmList={dmList}
             setDmList={setDmList}
             setActiveChat={setActiveChat}

@@ -12,11 +12,11 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => ({
     folder: 'discord_dm_files',
-    resource_type: 'auto', // allow all file types
+    resource_type: 'auto', 
     public_id: `${Date.now()}-${file.originalname}`,
   }),
 });
 
-const upload = multer({ storage });
+const upload = multer({ storage }); 
 
-module.exports = upload; 
+module.exports = { upload, cloudinary }; 

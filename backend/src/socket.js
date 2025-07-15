@@ -1,7 +1,7 @@
 const http = require('http');
 const { Server } = require('socket.io');
 const app = require('./app');
-const { db, messages, messageSessions } = require('./db');
+const { db, messages, messageSessions, groupDMMessages } = require('./db');
 const { and, or, eq, asc } = require('drizzle-orm');
 
 const server = http.createServer(app);
@@ -61,6 +61,24 @@ io.on('connection', (socket) => {
     const sessions = await db.select().from(messageSessions)
       .where(or(eq(messageSessions.user1Id, userId), eq(messageSessions.user2Id, userId)));
     callback(sessions);
+  });
+
+  // Join a group DM room
+  socket.on('join_group_dm', (groupDmId) => {
+    socket.join(`group_dm_${groupDmId}`);
+  });
+
+  // Send a group DM message
+  socket.on('send_group_dm', async ({ groupDmId, senderId, senderName, content }) => {
+    // Save message to DB
+    const [message] = await db.insert(groupDMMessages).values({
+      groupDmId,
+      senderId,
+      senderName,
+      content,
+    }).returning();
+    // Emit to all in the group room
+    io.to(`group_dm_${groupDmId}`).emit('receive_group_dm', message);
   });
 
   // Handle disconnect

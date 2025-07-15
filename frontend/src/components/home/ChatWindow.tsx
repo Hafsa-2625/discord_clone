@@ -1,4 +1,4 @@
-import { Plus, Gift, Image, Smile, Gamepad2, Phone, Video, Paperclip, Upload, BarChart2, Grid } from "lucide-react";
+import { X, Plus, Gift, Image, Smile, Gamepad2, Phone, Video, Paperclip, Upload, BarChart2, Grid } from "lucide-react";
 import React, { useRef, useState, useEffect } from "react";
 
 interface FileMessage {
@@ -154,7 +154,7 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
   }, [plusMenuOpen]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       <div className="flex items-center px-6 py-4 border-b border-[#23272a] bg-[#313338]">
         <img src="/discord.png" alt="avatar" className="w-8 h-8 rounded-full bg-[#5865f2] mr-3" />
         <span className="font-bold text-lg">{activeChat.name}</span>
@@ -163,9 +163,10 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
           <button className="p-2 hover:bg-[#23272a] rounded-full"><Video size={20} /></button>
           <button className="p-2 hover:bg-[#23272a] rounded-full"><Paperclip size={20} /></button>
         </div>
-        <button className="ml-2 text-gray-400 hover:text-white" onClick={() => setActiveChat(null)}>&times;</button>
+        
+        <button className="ml-2 text-gray-400 hover:text-white" onClick={() => setActiveChat(null)}><X size={24} /></button>
       </div>
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[#313338]" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 bg-[#313338]">
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.senderId == user.id ? 'justify-end' : 'justify-start'}`}>
             {msg.file ? (

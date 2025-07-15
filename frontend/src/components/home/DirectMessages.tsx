@@ -63,7 +63,7 @@ export default function DirectMessages({ dmList, setActiveChat, user, friends, s
         <span>Direct Messages</span>
         <Button variant="ghost" className="justify-start gap-2 mb-1" onClick={() => setShowDmModal(true)}><Plus size={18} /></Button>
       </div>
-      <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
+      <div className="flex flex-col gap-2">
         {dmList.map(dm => (
           <div
             key={dm.id}
