@@ -1,7 +1,7 @@
 const http = require('http');
 const { Server } = require('socket.io');
 const app = require('./app');
-const { db, messages, messageSessions, groupDMMessages } = require('./db');
+const { db, messages, messageSessions, groupDMMessages, channelMessages } = require('./db');
 const { and, or, eq, asc } = require('drizzle-orm');
 
 const server = http.createServer(app);
@@ -79,6 +79,24 @@ io.on('connection', (socket) => {
     }).returning();
     // Emit to all in the group room
     io.to(`group_dm_${groupDmId}`).emit('receive_group_dm', message);
+  });
+
+  // Join a channel room
+  socket.on('join_channel', (channelId) => {
+    socket.join(`channel_${channelId}`);
+  });
+
+  // Send a message in a channel
+  socket.on('send_channel_message', async ({ channelId, userId, content }) => {
+    if (!channelId || !userId || !content) return;
+    // Save message to DB
+    const [message] = await db.insert(channelMessages).values({
+      channel_id: parseInt(channelId, 10),
+      user_id: parseInt(userId, 10),
+      content,
+    }).returning();
+    // Emit to all in the channel room
+    io.to(`channel_${channelId}`).emit('receive_channel_message', message);
   });
 
   // Handle disconnect

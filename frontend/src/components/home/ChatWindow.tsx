@@ -52,6 +52,8 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sessionIdCache, setSessionIdCache] = useState<{ [friendId: string]: number }>({});
 
+  // Remove lastMessageRef and scroll-into-view effect
+
   // Helper to get or fetch sessionId for this DM
   const getSessionId = async () => {
     if (sessionIdCache[activeChat.id]) return sessionIdCache[activeChat.id];
@@ -166,9 +168,15 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
         
         <button className="ml-2 text-gray-400 hover:text-white" onClick={() => setActiveChat(null)}><X size={24} /></button>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 bg-[#313338]">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`flex ${msg.senderId == user.id ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 bg-[#313338]"
+        style={{ display: 'flex', flexDirection: 'column-reverse' }}
+      >
+        {[...messages].reverse().map((msg, idx) => (
+          <div
+            key={idx}
+            className={`flex ${msg.senderId == user.id ? 'justify-end' : 'justify-start'}`}
+          >
             {msg.file ? (
               <div className="bg-[#23272a] rounded-lg p-4 max-w-xs">
                 {isImageFile(msg.file.type) ? (

@@ -104,10 +104,10 @@ export default function ServerPage() {
   if (!server) return <div className="p-8 text-white">Server not found.</div>;
 
   return (
-    <div className="flex min-h-screen bg-[#313338] text-white">
+    <div className="flex h-screen bg-[#313338] text-white">
       <Sidebar onAddServer={() => {}} />
       {/* Channel List */}
-      <nav className="w-72 bg-[#23272a] flex flex-col py-4 px-2 border-r border-[#23272a] min-h-screen">
+      <nav className="w-72 bg-[#23272a] flex flex-col py-4 px-2 border-r border-[#23272a] h-full">
         {/* Server Name Dropdown */}
         <div className="flex items-center gap-2 mb-4 px-2">
           <span className="font-semibold text-lg truncate">{server.name}</span>
@@ -120,65 +120,70 @@ export default function ServerPage() {
         <button className="flex items-center gap-2 px-2 py-2 hover:bg-[#2b2d31] rounded mb-4">
           <Shield size={18} /> Server Boosts
         </button>
-        {/* Text Channels */}
-        <div className="mb-2 mt-2">
-          <div className="flex items-center justify-between px-2 text-gray-400 text-xs uppercase mb-1">
-            <span>Text Channels</span>
-            <button className="hover:text-white" onClick={() => { setModalType("text"); setModalOpen(true); }}><Plus size={16} /></button>
-          </div>
-          {channelsLoading ? (
-            <div className="text-xs text-gray-400 px-2 py-1">Loading...</div>
-          ) : textChannels.length === 0 ? (
-            <div className="text-xs text-gray-400 px-2 py-1">No text channels</div>
-          ) : textChannels.map((ch) => (
-            <div key={ch.id} className="flex items-center group">
-              <Link
-                to={`/server/${id}/channel/${ch.id}`}
-                className={`flex-1 flex items-center gap-2 px-2 py-2 rounded font-medium mb-1 bg-[#23272a] hover:bg-[#383a40] text-gray-400 ${isChannelSelected(ch.id) ? "bg-[#383a40] text-white" : ""}`}
-              >
-                <Hash size={18} /> {ch.name}
-              </Link>
-              <button
-                className="ml-1 p-1 text-gray-400 hover:text-white opacity-70 group-hover:opacity-100"
-                onClick={() => { setSettingsChannel(ch); setSettingsModalOpen(true); }}
-              >
-                <Settings size={16} />
-              </button>
+        {/* Channel List Scrollable Area */}
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          {/* Text Channels */}
+          <div className="mb-2 mt-2">
+            <div className="flex items-center justify-between px-2 text-gray-400 text-xs uppercase mb-1">
+              <span>Text Channels</span>
+              <button className="hover:text-white" onClick={() => { setModalType("text"); setModalOpen(true); }}><Plus size={16} /></button>
             </div>
-          ))}
-        </div>
-        {/* Voice Channels */}
-        <div className="mb-2 mt-4">
-          <div className="flex items-center justify-between px-2 text-gray-400 text-xs uppercase mb-1">
-            <span>Voice Channels</span>
-            <button className="hover:text-white" onClick={() => { setModalType("voice"); setModalOpen(true); }}><Plus size={16} /></button>
+            {channelsLoading ? (
+              <div className="text-xs text-gray-400 px-2 py-1">Loading...</div>
+            ) : textChannels.length === 0 ? (
+              <div className="text-xs text-gray-400 px-2 py-1">No text channels</div>
+            ) : textChannels.map((ch) => (
+              <div key={ch.id} className="flex items-center group">
+                <Link
+                  to={`/server/${id}/channel/${ch.id}`}
+                  className={`flex-1 flex items-center gap-2 px-2 py-2 rounded font-medium mb-1 bg-[#23272a] hover:bg-[#383a40] text-gray-400 ${isChannelSelected(ch.id) ? "bg-[#383a40] text-white" : ""}`}
+                >
+                  <Hash size={18} /> {ch.name}
+                </Link>
+                <button
+                  className="ml-1 p-1 text-gray-400 hover:text-white opacity-70 group-hover:opacity-100"
+                  onClick={() => { setSettingsChannel(ch); setSettingsModalOpen(true); }}
+                >
+                  <Settings size={16} />
+                </button>
+              </div>
+            ))}
           </div>
-          {channelsLoading ? (
-            <div className="text-xs text-gray-400 px-2 py-1">Loading...</div>
-          ) : voiceChannels.length === 0 ? (
-            <div className="text-xs text-gray-400 px-2 py-1">No voice channels</div>
-          ) : voiceChannels.map((ch) => (
-            <div key={ch.id} className="flex items-center group">
-              <Link
-                to={`/server/${id}/channel/${ch.id}`}
-                className={`flex-1 flex items-center gap-2 px-2 py-2 rounded hover:bg-[#383a40] mb-1 text-gray-400 ${isChannelSelected(ch.id) ? "bg-[#383a40] text-white" : ""}`}
-              >
-                <Volume2 size={18} /> {ch.name}
-              </Link>
-              <button
-                className="ml-1 p-1 text-gray-400 hover:text-white opacity-70 group-hover:opacity-100"
-                onClick={() => { setSettingsChannel(ch); setSettingsModalOpen(true); }}
-              >
-                <Settings size={16} />
-              </button>
+          {/* Voice Channels */}
+          <div className="mb-2 mt-4">
+            <div className="flex items-center justify-between px-2 text-gray-400 text-xs uppercase mb-1">
+              <span>Voice Channels</span>
+              <button className="hover:text-white" onClick={() => { setModalType("voice"); setModalOpen(true); }}><Plus size={16} /></button>
             </div>
-          ))}
+            {channelsLoading ? (
+              <div className="text-xs text-gray-400 px-2 py-1">Loading...</div>
+            ) : voiceChannels.length === 0 ? (
+              <div className="text-xs text-gray-400 px-2 py-1">No voice channels</div>
+            ) : voiceChannels.map((ch) => (
+              <div key={ch.id} className="flex items-center group">
+                <Link
+                  to={`/server/${id}/channel/${ch.id}`}
+                  className={`flex-1 flex items-center gap-2 px-2 py-2 rounded hover:bg-[#383a40] mb-1 text-gray-400 ${isChannelSelected(ch.id) ? "bg-[#383a40] text-white" : ""}`}
+                >
+                  <Volume2 size={18} /> {ch.name}
+                </Link>
+                <button
+                  className="ml-1 p-1 text-gray-400 hover:text-white opacity-70 group-hover:opacity-100"
+                  onClick={() => { setSettingsChannel(ch); setSettingsModalOpen(true); }}
+                >
+                  <Settings size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </nav>
 
       {/* Main Content: Render nested channel page */}
-      <main className="flex-1 flex flex-col bg-[#313338] min-h-screen">
-        <Outlet />
+      <main className="flex-1 flex flex-col h-full min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <Outlet />
+        </div>
       </main>
       <CreateChannelModal
         open={modalOpen}
