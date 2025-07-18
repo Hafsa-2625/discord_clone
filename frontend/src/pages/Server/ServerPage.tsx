@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link, Outlet, useLocation } from "react-router-dom";
-import { Hash, Calendar, Shield, Volume2, ChevronDown, Plus, Settings } from "lucide-react";
+import { Hash, Calendar, Shield, Volume2, ChevronDown, Plus, Settings, UserPlus } from "lucide-react";
 import Sidebar from "@/components/home/Sidebar";
 import CreateChannelModal from "@/components/server/CreateChannelModal";
 import ChannelSettingsModal from "@/components/server/ChannelSettingsModal";
+import UserProfileBar from "@/components/home/UserProfileBar";
+import InviteLinkModal from "@/components/server/InviteLinkModal";
+import { useRef } from "react";
 
 export default function ServerPage() {
   const { id, channelId } = useParams<{ id: string; channelId?: string }>();
@@ -17,6 +20,16 @@ export default function ServerPage() {
   const [channelsLoading, setChannelsLoading] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsChannel, setSettingsChannel] = useState<any>(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleLogout = () => {
+    localStorage.clear();
+    window.location.href = "/";
+  };
 
   // Fetch server info
   useEffect(() => {
@@ -109,9 +122,31 @@ export default function ServerPage() {
       {/* Channel List */}
       <nav className="w-72 bg-[#23272a] flex flex-col py-4 px-2 border-r border-[#23272a] h-full">
         {/* Server Name Dropdown */}
-        <div className="flex items-center gap-2 mb-4 px-2">
-          <span className="font-semibold text-lg truncate">{server.name}</span>
-          <ChevronDown size={20} />
+        <div className="flex items-center gap-2 mb-4 px-2 relative">
+          <span className="font-semibold text-lg truncate">{server?.name}</span>
+          <button
+            className="p-1 rounded hover:bg-[#23272a]"
+            onClick={() => setDropdownOpen((v) => !v)}
+          >
+            <ChevronDown size={20} />
+          </button>
+          {dropdownOpen && (
+            <div
+              ref={dropdownRef}
+              className="absolute left-0 top-10 z-50 min-w-[200px] bg-[#202225] rounded-lg shadow-lg p-2"
+            >
+              <button
+                className="flex items-center gap-2 w-full px-3 py-2 hover:bg-[#5865f2] rounded text-white text-left"
+                onClick={() => {
+                  setInviteModalOpen(true);
+                  setDropdownOpen(false);
+                }}
+              >
+                <UserPlus size={18} /> Invite People
+              </button>
+              {/* Add more menu items here if needed */}
+            </div>
+          )}
         </div>
         {/* Events and Server Boosts */}
         <button className="flex items-center gap-2 px-2 py-2 hover:bg-[#2b2d31] rounded">
@@ -177,6 +212,13 @@ export default function ServerPage() {
             ))}
           </div>
         </div>
+        <div className="flex-1" />
+        <UserProfileBar
+          user={user}
+          showProfileMenu={showProfileMenu}
+          setShowProfileMenu={setShowProfileMenu}
+          handleLogout={handleLogout}
+        />
       </nav>
 
       {/* Main Content: Render nested channel page */}
@@ -198,6 +240,12 @@ export default function ServerPage() {
         onSave={handleSaveChannel}
         onDelete={handleDeleteChannel}
       />
+      {inviteModalOpen && (
+        <InviteLinkModal
+          serverId={server?.id}
+          onClose={() => setInviteModalOpen(false)}
+        />
+      )}
     </div>
   );
 } 

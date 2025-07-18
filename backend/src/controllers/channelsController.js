@@ -11,6 +11,7 @@ const multer = require('multer');
 const { cloudinary } = require('../utils/multerCloudinary');
 const { and, eq } = require('drizzle-orm');
 const { uploadChannelAttachmentMulter } = require('../utils/multerChannelAttachments');
+const { serverMembers } = require('../db');
 // Create a new channel
 async function createChannel(req, res) {
   try {
@@ -133,8 +134,23 @@ async function respondToChannelInvite(req, res) {
     if (!invite) return res.status(404).json({ error: 'Invite not found' });
     if (invite.status !== 'pending') return res.status(400).json({ error: 'Invite already handled' });
     if (action === 'accept') {
-      // Add to channel members
+      // Get the channel to find the serverId
+      const channelArr = await db.select().from(channels).where(eq(channels.id, invite.channelId));
+      const channel = channelArr[0];
+      if (!channel) return res.status(404).json({ error: 'Channel not found' });
+      const serverId = channel.serverId;
+      // Add to server members if not already a member
+      const existingServerMember = await db.select().from(serverMembers)
+        .where(and(eq(serverMembers.serverId, serverId), eq(serverMembers.userId, invite.inviteeId)));
+      if (existingServerMember.length === 0) {
+        await db.insert(serverMembers).values({ serverId, userId: invite.inviteeId });
+      }
+      // Add to channel members if not already a member
+      const existingChannelMember = await db.select().from(channelMembers)
+        .where(and(eq(channelMembers.channelId, invite.channelId), eq(channelMembers.userId, invite.inviteeId)));
+      if (existingChannelMember.length === 0) {
       await db.insert(channelMembers).values({ channelId: invite.channelId, userId: invite.inviteeId });
+      }
       await db.update(channelInvites).set({ status: 'accepted' }).where(eq(channelInvites.id, parseInt(inviteId, 10)));
       return res.json({ success: true });
     } else if (action === 'decline') {
@@ -175,7 +191,17 @@ async function getChannelMessages(req, res) {
     if (!channelId) {
       return res.status(400).json({ error: 'channelId is required' });
     }
-    const messages = await db.select().from(channelMessages)
+    // Use Drizzle's .select({ ... }) object syntax to avoid stack overflow
+    const messages = await db
+      .select({
+        id: channelMessages.id,
+        user_id: channelMessages.user_id,
+        content: channelMessages.content,
+        created_at: channelMessages.created_at,
+        userName: users.name,
+      })
+      .from(channelMessages)
+      .leftJoin(users, eq(channelMessages.user_id, users.id))
       .where(eq(channelMessages.channel_id, parseInt(channelId, 10)))
       .orderBy(channelMessages.created_at);
     res.json(messages);

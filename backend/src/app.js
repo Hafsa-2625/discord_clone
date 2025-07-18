@@ -11,5 +11,6 @@ app.use('/api/servers', require('./routes/serverRoutes'));
 app.use('/api/dms', require('./routes/dmRoutes'));
 app.use('/api/channels', require('./routes/channelsRoutes'));
 app.use('/api/group-dms', require('./routes/groupDMRoutes'));
+app.use('/api/invites', require('./routes/inviteRoutes'));
 
 module.exports = app;

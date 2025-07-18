@@ -6,6 +6,8 @@ const { channelInvites } = require('./channelInvitesSchema');
 const { channelMembers } = require('./channelMembersSchema');
 const { channelMessages } = require('./channelMessagesSchema');
 const { channelAttachments } = require('./channelAttachmentsSchema');
+const { serverMembers } = require('./serverMembersSchema');
+const { serverInvites } = require('./serverInvitesSchema');
 require('dotenv').config();
 
 const pool = new Pool({
@@ -29,5 +31,7 @@ module.exports = {
   channelInvites,
   channelMembers,
   channelMessages,
-  channelAttachments
+  channelAttachments,
+  serverMembers,
+  serverInvites,
 };

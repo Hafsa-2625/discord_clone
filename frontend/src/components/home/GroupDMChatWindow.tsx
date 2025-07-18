@@ -39,7 +39,7 @@ function isImageFile(type: string) {
 
 function DmPlusMenu({ onUploadFile, onClose }: { onUploadFile: () => void; onClose: () => void }) {
   return (
-    <div className="absolute bottom-16 left-4 z-50 bg-[#23272a] rounded-xl shadow-lg py-2 w-56 flex flex-col gap-1 border border-[#383a40] animate-fade-in">
+    <div className="absolute bottom-16 left-4 z-50 bg-[#202225] rounded-xl shadow-lg py-2 w-56 flex flex-col gap-1 border border-[#383a40] animate-fade-in">
       <button className="flex items-center gap-3 px-4 py-3 hover:bg-[#313338] text-white text-base font-medium rounded transition" onClick={() => { onUploadFile(); onClose(); }}>
         <Upload size={20} /> Upload a File
       </button>

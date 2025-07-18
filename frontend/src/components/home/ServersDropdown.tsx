@@ -30,10 +30,10 @@ const ServersDropdown: React.FC<ServersDropdownProps> = ({ onSelectServer, ancho
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     if (!user.id) return;
     setLoading(true);
-    fetch(`http://localhost:5000/api/servers?userId=${user.id}`)
+    fetch(`http://localhost:5000/api/servers/user/${user.id}`)
       .then((res) => res.json())
       .then((data) => {
-        setServers(data.servers || []);
+        setServers(data || []);
         setLoading(false);
       })
       .catch((err) => {
@@ -61,7 +61,7 @@ const ServersDropdown: React.FC<ServersDropdownProps> = ({ onSelectServer, ancho
   return (
     <div
       ref={dropdownRef}
-      className="absolute left-0 top-[110%] z-50 min-w-[180px] bg-[#23272a] rounded-lg shadow-lg p-2 max-h-80 overflow-y-auto"
+      className="absolute left-0 top-[110%] z-50 min-w-[180px] bg-[#202225] rounded-lg shadow-lg p-2 max-h-80 overflow-y-auto"
     >
       {loading && <div className="text-white p-2">Loading...</div>}
       {error && <div className="text-red-400 p-2">{error}</div>}

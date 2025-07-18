@@ -8,6 +8,7 @@ import Home from "./pages/Home/Home";
 import Settings from "./pages/Settings/Settings";
 import ServerPage from "./pages/Server/ServerPage";
 import ChannelPage from "./pages/Server/ChannelPage";
+import InviteJoinPage from "./pages/InviteJoinPage";
 
 import "./App.css";
 
@@ -82,6 +83,7 @@ function App() {
         <Route path="/server/:id" element={<PrivateRoute><ServerPage /></PrivateRoute>}>
           <Route path="channel/:channelId" element={<ChannelPage />} />
         </Route>
+        <Route path="/invite/:inviteCode" element={<InviteJoinPage />} />
       </Routes>
     </Router>
   );

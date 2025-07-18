@@ -26,7 +26,7 @@ export default function UserProfileBar({ user, showProfileMenu, setShowProfileMe
         </div>
       </div>
       {showProfileMenu && (
-        <div className="absolute left-0 bottom-full mb-2 z-50 bg-[#23272a] border border-[#5865f2] rounded-lg shadow-lg w-40 p-2 flex flex-col gap-2 animate-fade-in">
+        <div className="absolute left-0 bottom-full mb-2 z-50 bg-[#202225] border border-[#5865f2] rounded-lg shadow-lg w-40 p-2 flex flex-col gap-2 animate-fade-in">
           <Button variant="ghost" className="justify-start" onClick={() => alert('Manage Account coming soon!')}>Manage Account</Button>
           <Button variant="ghost" className="justify-start text-red-500" onClick={handleLogout}>Logout</Button>
         </div>
