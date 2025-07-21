@@ -1,6 +1,9 @@
 import { X, Plus, Gift, Image, Smile, Gamepad2, Phone, Video, Paperclip, Upload, BarChart2, Grid } from "lucide-react";
 import React, { useRef, useState, useEffect } from "react";
 
+// --- Voice Call State Types ---
+type CallState = 'idle' | 'calling' | 'receiving' | 'in-call';
+
 interface FileMessage {
   url: string;
   name: string;
@@ -52,7 +55,203 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sessionIdCache, setSessionIdCache] = useState<{ [friendId: string]: number }>({});
 
-  // Remove lastMessageRef and scroll-into-view effect
+  // --- Voice Call State ---
+  const [callState, setCallState] = useState<CallState>('idle');
+  const [callFrom, setCallFrom] = useState<string | null>(null); // userId of caller
+  const [callError, setCallError] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+
+  // --- WebRTC Config ---
+  const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+  // --- Start Call ---
+  const startCall = async () => {
+    setCallError(null);
+    setCallState('calling');
+    try {
+      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = localStream;
+      const pc = new RTCPeerConnection(rtcConfig);
+      peerConnectionRef.current = pc;
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socketRef.current.emit('call:ice-candidate', {
+            to: activeChat.id,
+            from: user.id,
+            candidate: event.candidate
+          });
+        }
+      };
+      pc.ontrack = (event) => {
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+        }
+      };
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socketRef.current.emit('call:offer', {
+        to: activeChat.id,
+        from: user.id,
+        offer
+      });
+    } catch (err) {
+      setCallError('Could not start call: ' + (err as any).message);
+      setCallState('idle');
+    }
+  };
+
+  // --- Accept Call ---
+  const acceptCall = async () => {
+    setCallError(null);
+    setCallState('in-call');
+    try {
+      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = localStream;
+      const pc = new RTCPeerConnection(rtcConfig);
+      peerConnectionRef.current = pc;
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socketRef.current.emit('call:ice-candidate', {
+            to: callFrom,
+            from: user.id,
+            candidate: event.candidate
+          });
+        }
+      };
+      pc.ontrack = (event) => {
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+        }
+      };
+      // Wait for offer to be set as remote desc in handler below
+    } catch (err) {
+      setCallError('Could not accept call: ' + (err as any).message);
+      setCallState('idle');
+    }
+  };
+
+  // --- End Call ---
+  const endCall = () => {
+    setCallState('idle');
+    setCallFrom(null);
+    setCallError(null);
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+    }
+    // Notify peer
+    socketRef.current.emit('call:end', {
+      to: callState === 'in-call' ? (callFrom || activeChat.id) : activeChat.id,
+      from: user.id
+    });
+  };
+
+  // --- Decline Call ---
+  const declineCall = () => {
+    setCallState('idle');
+    setCallFrom(null);
+    setCallError(null);
+    socketRef.current.emit('call:end', {
+      to: callFrom,
+      from: user.id
+    });
+  };
+
+  // --- Socket Event Handlers ---
+  useEffect(() => {
+    if (!socketRef.current) return;
+    // --- Incoming Offer ---
+    const handleOffer = async ({ from, offer }: { from: string, offer: any }) => {
+      setCallFrom(from);
+      setCallState('receiving');
+      // Save offer for later (when user accepts)
+      peerConnectionRef.current = new RTCPeerConnection(rtcConfig);
+      peerConnectionRef.current.onicecandidate = (event) => {
+        if (event.candidate) {
+          socketRef.current.emit('call:ice-candidate', {
+            to: from,
+            from: user.id,
+            candidate: event.candidate
+          });
+        }
+      };
+      peerConnectionRef.current.ontrack = (event) => {
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+        }
+      };
+      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+    };
+    // --- Incoming Answer ---
+    const handleAnswer = async ({ from, answer }: { from: string, answer: any }) => {
+      if (peerConnectionRef.current) {
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+        setCallState('in-call');
+      }
+    };
+    // --- Incoming ICE Candidate ---
+    const handleIceCandidate = async ({ from, candidate }: { from: string, candidate: any }) => {
+      if (peerConnectionRef.current && candidate) {
+        try {
+          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          // Ignore
+        }
+      }
+    };
+    // --- Incoming Call End ---
+    const handleCallEnd = ({ from }: { from: string }) => {
+      endCall();
+    };
+    socketRef.current.on('call:offer', handleOffer);
+    socketRef.current.on('call:answer', handleAnswer);
+    socketRef.current.on('call:ice-candidate', handleIceCandidate);
+    socketRef.current.on('call:end', handleCallEnd);
+    return () => {
+      socketRef.current.off('call:offer', handleOffer);
+      socketRef.current.off('call:answer', handleAnswer);
+      socketRef.current.off('call:ice-candidate', handleIceCandidate);
+      socketRef.current.off('call:end', handleCallEnd);
+    };
+    // eslint-disable-next-line
+  }, [socketRef, user.id, activeChat.id]);
+
+  // --- When accepting a call, set remote offer and send answer ---
+  useEffect(() => {
+    if (callState === 'in-call' && peerConnectionRef.current && peerConnectionRef.current.signalingState === 'have-remote-offer') {
+      (async () => {
+        try {
+          const localStream = localStreamRef.current;
+          if (localStream) {
+            localStream.getTracks().forEach(track => peerConnectionRef.current!.addTrack(track, localStream));
+          }
+          const answer = await peerConnectionRef.current!.createAnswer();
+          await peerConnectionRef.current!.setLocalDescription(answer);
+          socketRef.current.emit('call:answer', {
+            to: callFrom,
+            from: user.id,
+            answer
+          });
+        } catch (err) {
+          setCallError('Failed to answer call: ' + (err as any).message);
+          endCall();
+        }
+      })();
+    }
+    // eslint-disable-next-line
+  }, [callState]);
 
   // Helper to get or fetch sessionId for this DM
   const getSessionId = async () => {
@@ -161,13 +360,44 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
         <img src="/discord.png" alt="avatar" className="w-8 h-8 rounded-full bg-[#5865f2] mr-3" />
         <span className="font-bold text-lg">{activeChat.name}</span>
         <div className="flex gap-2 ml-auto">
-          <button className="p-2 hover:bg-[#23272a] rounded-full"><Phone size={20} /></button>
+          {/* --- Voice Call Button --- */}
+          <button
+            className="p-2 hover:bg-[#23272a] rounded-full"
+            onClick={startCall}
+            disabled={callState !== 'idle'}
+            title={callState !== 'idle' ? 'Already in a call' : 'Start voice call'}
+          >
+            <Phone size={20} />
+          </button>
           <button className="p-2 hover:bg-[#23272a] rounded-full"><Video size={20} /></button>
           <button className="p-2 hover:bg-[#23272a] rounded-full"><Paperclip size={20} /></button>
         </div>
-        
         <button className="ml-2 text-gray-400 hover:text-white" onClick={() => setActiveChat(null)}><X size={24} /></button>
       </div>
+      {/* --- Incoming Call Dialog --- */}
+      {callState === 'receiving' && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-60">
+          <div className="bg-[#23272a] p-8 rounded-xl shadow-lg flex flex-col items-center">
+            <p className="text-white text-lg mb-4">Incoming call...</p>
+            <div className="flex gap-4">
+              <button className="px-6 py-2 bg-green-500 text-white rounded-lg font-bold" onClick={acceptCall}>Accept</button>
+              <button className="px-6 py-2 bg-red-500 text-white rounded-lg font-bold" onClick={declineCall}>Decline</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* --- In-Call Controls --- */}
+      {callState === 'in-call' && (
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 bg-[#23272a] px-8 py-4 rounded-full flex items-center gap-6 shadow-lg">
+          <span className="text-white">In call with {activeChat.name}</span>
+          <button className="p-2 bg-red-600 text-white rounded-full" onClick={endCall}><Phone size={20} /></button>
+          <audio ref={remoteAudioRef} autoPlay playsInline />
+        </div>
+      )}
+      {/* --- Call Error --- */}
+      {callError && (
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-700 text-white px-6 py-2 rounded-lg shadow-lg">{callError}</div>
+      )}
       <div
         className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 bg-[#313338]"
         style={{ display: 'flex', flexDirection: 'column-reverse' }}

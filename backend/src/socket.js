@@ -99,6 +99,38 @@ io.on('connection', (socket) => {
     io.to(`channel_${channelId}`).emit('receive_channel_message', message);
   });
 
+  // Relay offer
+  socket.on('call:offer', ({ to, offer, from }) => {
+    const receiverSocketId = onlineUsers[to];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('call:offer', { from, offer });
+    }
+  });
+
+  // Relay answer
+  socket.on('call:answer', ({ to, answer, from }) => {
+    const receiverSocketId = onlineUsers[to];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('call:answer', { from, answer });
+    }
+  });
+
+  // Relay ICE candidates
+  socket.on('call:ice-candidate', ({ to, candidate, from }) => {
+    const receiverSocketId = onlineUsers[to];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('call:ice-candidate', { from, candidate });
+    }
+  });
+
+  // Relay call end
+  socket.on('call:end', ({ to, from }) => {
+    const receiverSocketId = onlineUsers[to];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('call:end', { from });
+    }
+  });
+
   // Handle disconnect
   socket.on('disconnect', () => {
     for (const [userId, sockId] of Object.entries(onlineUsers)) {
