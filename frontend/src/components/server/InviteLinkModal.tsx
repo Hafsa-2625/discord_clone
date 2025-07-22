@@ -11,7 +11,8 @@ const InviteLinkModal: React.FC<InviteLinkModalProps> = ({ serverId, onClose }) 
 
   useEffect(() => {
     if (!serverId) return;
-    fetch(`http://localhost:5000/api/servers/${serverId}/invites`, {
+    const API_URL = import.meta.env.VITE_API_URL;
+    fetch(`${API_URL}/api/servers/${serverId}/invites`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     })

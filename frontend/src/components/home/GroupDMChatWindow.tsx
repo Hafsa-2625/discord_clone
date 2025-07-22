@@ -56,6 +56,7 @@ function DmPlusMenu({ onUploadFile, onClose }: { onUploadFile: () => void; onClo
 const GroupDMChatWindow: React.FC<GroupDMChatWindowProps> = ({ group, members, onClose, messages, newMessage, setNewMessage, user, socketRef, setMessages }) => {
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const API_URL = import.meta.env.VITE_API_URL;
 
   // Remove lastMessageRef and scroll-into-view effect
 
@@ -63,7 +64,7 @@ const GroupDMChatWindow: React.FC<GroupDMChatWindowProps> = ({ group, members, o
   useEffect(() => {
     if (!group || !group.id) return;
     // Fetch messages
-    fetch(`http://localhost:5000/api/group-dms/${group.id}/messages`)
+    fetch(`${API_URL}/api/group-dms/${group.id}/messages`)
       .then(res => res.json())
       .then(data => setMessages(data.messages.map((m: any) => {
         if (m.type === 'text') {
@@ -122,7 +123,7 @@ const GroupDMChatWindow: React.FC<GroupDMChatWindowProps> = ({ group, members, o
       formData.append('groupDmId', group.id.toString());
       formData.append('senderId', user.id);
       formData.append('senderName', user.name);
-      const res = await fetch('http://localhost:5000/api/group-dms/upload', {
+      const res = await fetch(`${API_URL}/api/group-dms/upload`, {
         method: 'POST',
         body: formData,
       });

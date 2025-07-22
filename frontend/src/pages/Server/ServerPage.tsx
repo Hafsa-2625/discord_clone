@@ -25,6 +25,7 @@ export default function ServerPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const API_URL = import.meta.env.VITE_API_URL;
 
   const handleLogout = () => {
     localStorage.clear();
@@ -35,7 +36,7 @@ export default function ServerPage() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    fetch(`http://localhost:5000/api/servers/${id}`)
+    fetch(`${API_URL}/api/servers/${id}`)
       .then((res) => {
         if (!res.ok) throw new Error("Server not found");
         return res.json();
@@ -49,7 +50,7 @@ export default function ServerPage() {
   const fetchChannels = () => {
     if (!id) return;
     setChannelsLoading(true);
-    fetch(`http://localhost:5000/api/channels/server/${id}`)
+    fetch(`${API_URL}/api/channels/server/${id}`)
       .then((res) => res.json())
       .then((data) => setChannels(data))
       .catch(() => setChannels([]))
@@ -68,7 +69,7 @@ export default function ServerPage() {
   const handleCreateChannel = async ({ type, name, isPrivate }: { type: "text" | "voice"; name: string; isPrivate: boolean }) => {
     if (!id) return;
     try {
-      await fetch("http://localhost:5000/api/channels", {
+      await fetch(`${API_URL}/api/channels`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ serverId: id, name, type }),
@@ -84,7 +85,7 @@ export default function ServerPage() {
   const handleSaveChannel = async (data: { name: string; topic: string }) => {
     if (!settingsChannel) return;
     try {
-      await fetch(`http://localhost:5000/api/channels/${settingsChannel.id}`, {
+      await fetch(`${API_URL}/api/channels/${settingsChannel.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -99,7 +100,7 @@ export default function ServerPage() {
   const handleDeleteChannel = async () => {
     if (!settingsChannel) return;
     try {
-      await fetch(`http://localhost:5000/api/channels/${settingsChannel.id}`, {
+      await fetch(`${API_URL}/api/channels/${settingsChannel.id}`, {
         method: "DELETE"
       });
       setSettingsModalOpen(false);

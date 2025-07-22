@@ -69,19 +69,20 @@ const {
   const { socketRef } = useSocket(user, friends, dmList, setMessages, setDmList);
   const [channelInvites, setChannelInvites] = useState<any[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     // Fetch channel invites for this user
     setInvitesLoading(true);
     console.log('Fetching invites for user.id:', user.id, typeof user.id);
-    fetch(`http://localhost:5000/api/channels/invites?userId=${Number(user.id)}`)
+    fetch(`${API_URL}/api/channels/invites?userId=${Number(user.id)}`)
       .then(res => res.json())
       .then(data => setChannelInvites(data))
       .finally(() => setInvitesLoading(false));
   }, [user.id]);
 
   const handleChannelInviteRespond = async (inviteId: number, action: 'accept' | 'decline') => {
-    await fetch(`http://localhost:5000/api/channels/invites/${inviteId}/respond`, {
+    await fetch(`${API_URL}/api/channels/invites/${inviteId}/respond`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
@@ -100,12 +101,12 @@ const {
     formData.append('creatorId', user.id);
     formData.append('memberIds', JSON.stringify(selectedFriendIds));
     if (groupImage) formData.append('image', groupImage);
-    const res = await fetch('http://localhost:5000/api/group-dms', {
+    const res = await fetch(`${API_URL}/api/group-dms`, {
       method: 'POST',
       body: formData,
     });
     const { group } = await res.json();
-    const detailsRes = await fetch(`http://localhost:5000/api/group-dms/${group.id}`);
+    const detailsRes = await fetch(`${API_URL}/api/group-dms/${group.id}`);
     const details = await detailsRes.json();
     setGroupDMs(gdms => [...gdms, { ...details.group, members: details.members }]);
     setActiveGroupDM({ ...details.group, members: details.members });

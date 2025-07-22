@@ -27,7 +27,8 @@ export default function CustomizeServerModal({ onBack, onClose }: { onBack: () =
       formData.append("owner_id", String(user.id));
     }
     try {
-      const res = await fetch("http://localhost:5000/api/servers", {
+      const API_URL = import.meta.env.VITE_API_URL;
+      const res = await fetch(`${API_URL}/api/servers`, {
         method: "POST",
         body: formData,
         headers: {

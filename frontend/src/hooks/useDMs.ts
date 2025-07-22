@@ -5,11 +5,12 @@ export function useDMs(user: any, friends: {id: string, name: string}[]) {
   const [activeChat, setActiveChat] = useState<{id: string, name: string} | null>(null);
   const [dmMessages, setDmMessages] = useState<{senderId: string, message: string, createdAt?: string}[]>([]);
   const [dmNewMessage, setDmNewMessage] = useState('');
+  const API_URL = import.meta.env.VITE_API_URL;
 
   // Fetch persistent DM sessions from backend and update dmList
   useEffect(() => {
     if (user.id && friends.length) {
-      fetch(`http://localhost:5000/api/dms/list?userId=${user.id}`)
+      fetch(`${API_URL}/api/dms/list?userId=${user.id}`)
         .then(res => res.json())
         .then((sessions: Array<{ user1Id: number, user2Id: number }>) => {
           const dms = sessions.map(session => {

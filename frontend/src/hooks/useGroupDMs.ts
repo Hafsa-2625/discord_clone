@@ -6,11 +6,12 @@ export function useGroupDMs(user: any) {
   const [groupMessages, setGroupMessages] = useState<{senderId: string, message: string, createdAt?: string}[]>([]);
   const [groupNewMessage, setGroupNewMessage] = useState('');
   const [showGroupDmModal, setShowGroupDmModal] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL;
 
   // Fetch group DMs for the user on mount
   useEffect(() => {
     if (user.id) {
-      fetch(`http://localhost:5000/api/group-dms/user/${user.id}`)
+      fetch(`${API_URL}/api/group-dms/user/${user.id}`)
         .then(res => res.json())
         .then(data => setGroupDMs(data.groupDMs || []));
     }

@@ -23,7 +23,8 @@ export default function DirectMessages({ dmList, setActiveChat, user, friends, s
     // Add to dmList if not already present
     setDmList(list => list.some(dm => dm.id === friend.id) ? list : [...list, friend]);
     // Fetch all DM sessions for this user
-    const res = await fetch(`http://localhost:5000/api/dms/list?userId=${user.id}`);
+    const API_URL = import.meta.env.VITE_API_URL;
+    const res = await fetch(`${API_URL}/api/dms/list?userId=${user.id}`);
     const sessions = await res.json();
     // Find the session for this friend
     const session = sessions.find((s: any) =>
@@ -32,7 +33,7 @@ export default function DirectMessages({ dmList, setActiveChat, user, friends, s
     );
     if (session) {
       // Fetch all messages (text and files) for this session
-      const msgRes = await fetch(`http://localhost:5000/api/dms/${session.id}/messages`);
+      const msgRes = await fetch(`${API_URL}/api/dms/${session.id}/messages`);
       const allMessages = await msgRes.json();
       // Map to ChatWindow format
       setMessages(allMessages.map((m: any) => {

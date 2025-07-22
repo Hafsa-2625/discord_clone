@@ -62,6 +62,7 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
   const [isMuted, setIsMuted] = useState(false);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
   // --- WebRTC Config ---
@@ -76,9 +77,13 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
       localStreamRef.current = localStream;
       const pc = new RTCPeerConnection(rtcConfig);
       peerConnectionRef.current = pc;
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      // Add local tracks BEFORE creating offer
+      localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
+      });
       pc.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log('Local ICE candidate:', event.candidate);
           socketRef.current.emit('call:ice-candidate', {
             to: activeChat.id,
             from: user.id,
@@ -86,7 +91,19 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
           });
         }
       };
-      pc.ontrack = (event) => {
+      pc.oniceconnectionstatechange = () => {
+        if (pc) {
+          console.log('ICE connection state:', pc.iceConnectionState);
+        }
+      };
+      pc.onsignalingstatechange = () => {
+        if (pc) {
+          console.log('Signaling state:', pc.signalingState);
+        }
+      };
+      pc.ontrack = (event: RTCTrackEvent) => {
+        console.log('Received remote track', event.streams[0]);
+        remoteStreamRef.current = event.streams[0];
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = event.streams[0];
         }
@@ -116,6 +133,7 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
       localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
       pc.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log('Local ICE candidate:', event.candidate);
           socketRef.current.emit('call:ice-candidate', {
             to: callFrom,
             from: user.id,
@@ -123,7 +141,19 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
           });
         }
       };
-      pc.ontrack = (event) => {
+      pc.oniceconnectionstatechange = () => {
+        if (pc) {
+          console.log('ICE connection state:', pc.iceConnectionState);
+        }
+      };
+      pc.onsignalingstatechange = () => {
+        if (pc) {
+          console.log('Signaling state:', pc.signalingState);
+        }
+      };
+      pc.ontrack = (event: RTCTrackEvent) => {
+        console.log('Received remote track', event.streams[0]);
+        remoteStreamRef.current = event.streams[0];
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = event.streams[0];
         }
@@ -176,10 +206,12 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
     const handleOffer = async ({ from, offer }: { from: string, offer: any }) => {
       setCallFrom(from);
       setCallState('receiving');
-      // Save offer for later (when user accepts)
-      peerConnectionRef.current = new RTCPeerConnection(rtcConfig);
-      peerConnectionRef.current.onicecandidate = (event) => {
+      // Create peer connection
+      const pc = new RTCPeerConnection(rtcConfig);
+      peerConnectionRef.current = pc;
+      pc.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log('Local ICE candidate:', event.candidate);
           socketRef.current.emit('call:ice-candidate', {
             to: from,
             from: user.id,
@@ -187,12 +219,46 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
           });
         }
       };
-      peerConnectionRef.current.ontrack = (event) => {
+      pc.oniceconnectionstatechange = () => {
+        if (pc) {
+          console.log('ICE connection state:', pc.iceConnectionState);
+        }
+      };
+      pc.onsignalingstatechange = () => {
+        if (pc) {
+          console.log('Signaling state:', pc.signalingState);
+        }
+      };
+      pc.ontrack = (event: RTCTrackEvent) => {
+        console.log('Received remote track', event.streams[0]);
+        remoteStreamRef.current = event.streams[0];
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = event.streams[0];
         }
       };
-      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+      // --- Add local audio tracks before setting remote description ---
+      let localStream = localStreamRef.current;
+      if (!localStream) {
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          localStreamRef.current = localStream;
+        } catch (err) {
+          setCallError('Could not access microphone: ' + (err as any).message);
+          return;
+        }
+      }
+      localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream!);
+      });
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      // --- Immediately create and send answer ---
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socketRef.current.emit('call:answer', {
+        to: from,
+        from: user.id,
+        answer
+      });
     };
     // --- Incoming Answer ---
     const handleAnswer = async ({ from, answer }: { from: string, answer: any }) => {
@@ -228,36 +294,12 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
     // eslint-disable-next-line
   }, [socketRef, user.id, activeChat.id]);
 
-  // --- When accepting a call, set remote offer and send answer ---
-  useEffect(() => {
-    if (callState === 'in-call' && peerConnectionRef.current && peerConnectionRef.current.signalingState === 'have-remote-offer') {
-      (async () => {
-        try {
-          const localStream = localStreamRef.current;
-          if (localStream) {
-            localStream.getTracks().forEach(track => peerConnectionRef.current!.addTrack(track, localStream));
-          }
-          const answer = await peerConnectionRef.current!.createAnswer();
-          await peerConnectionRef.current!.setLocalDescription(answer);
-          socketRef.current.emit('call:answer', {
-            to: callFrom,
-            from: user.id,
-            answer
-          });
-        } catch (err) {
-          setCallError('Failed to answer call: ' + (err as any).message);
-          endCall();
-        }
-      })();
-    }
-    // eslint-disable-next-line
-  }, [callState]);
-
   // Helper to get or fetch sessionId for this DM
   const getSessionId = async () => {
     if (sessionIdCache[activeChat.id]) return sessionIdCache[activeChat.id];
+    const API_URL = import.meta.env.VITE_API_URL;
     // Fetch all sessions for this user
-    const res = await fetch(`http://localhost:5000/api/dms/list?userId=${user.id}`);
+    const res = await fetch(`${API_URL}/api/dms/list?userId=${user.id}`);
     const sessions = await res.json();
     // Find the session for this friend
     const session = sessions.find((s: any) =>
@@ -277,7 +319,8 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
     const fetchMessages = async () => {
       try {
         const sessionId = await getSessionId();
-        const res = await fetch(`http://localhost:5000/api/dms/${sessionId}/messages`);
+        const API_URL = import.meta.env.VITE_API_URL;
+        const res = await fetch(`${API_URL}/api/dms/${sessionId}/messages`);
         const allMessages = await res.json();
         setMessages(allMessages.map((m: any) => {
           if (m.type === 'text') {
@@ -312,12 +355,13 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
     if (!file) return;
     try {
       const sessionId = await getSessionId();
+      const API_URL = import.meta.env.VITE_API_URL;
       const formData = new FormData();
       formData.append('file', file);
       formData.append('sessionId', sessionId);
       formData.append('senderId', user.id);
       formData.append('receiverId', activeChat.id);
-      const res = await fetch('http://localhost:5000/api/dms/upload', {
+      const res = await fetch(`${API_URL}/api/dms/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -354,6 +398,13 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
     return () => document.removeEventListener("mousedown", handler);
   }, [plusMenuOpen]);
 
+  // Ensure remote stream is assigned to audio element when it appears or when call state changes
+  useEffect(() => {
+    if (callState === 'in-call' && remoteAudioRef.current && remoteStreamRef.current) {
+      remoteAudioRef.current.srcObject = remoteStreamRef.current;
+    }
+  }, [callState]);
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex items-center px-6 py-4 border-b border-[#23272a] bg-[#313338]">
@@ -386,14 +437,8 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
           </div>
         </div>
       )}
-      {/* --- In-Call Controls --- */}
-      {callState === 'in-call' && (
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 bg-[#23272a] px-8 py-4 rounded-full flex items-center gap-6 shadow-lg">
-          <span className="text-white">In call with {activeChat.name}</span>
-          <button className="p-2 bg-red-600 text-white rounded-full" onClick={endCall}><Phone size={20} /></button>
-          <audio ref={remoteAudioRef} autoPlay playsInline />
-        </div>
-      )}
+      {/* Always render the audio element for remote stream */}
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
       {/* --- Call Error --- */}
       {callError && (
         <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-700 text-white px-6 py-2 rounded-lg shadow-lg">{callError}</div>

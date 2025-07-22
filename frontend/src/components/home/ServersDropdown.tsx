@@ -30,7 +30,8 @@ const ServersDropdown: React.FC<ServersDropdownProps> = ({ onSelectServer, ancho
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     if (!user.id) return;
     setLoading(true);
-    fetch(`http://localhost:5000/api/servers/user/${user.id}`)
+    const API_URL = import.meta.env.VITE_API_URL;
+    fetch(`${API_URL}/api/servers/user/${user.id}`)
       .then((res) => res.json())
       .then((data) => {
         setServers(data || []);

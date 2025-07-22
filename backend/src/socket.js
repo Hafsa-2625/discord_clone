@@ -1,10 +1,18 @@
-const http = require('http');
+const fs = require('fs');
+const https = require('https');
 const { Server } = require('socket.io');
 const app = require('./app');
 const { db, messages, messageSessions, groupDMMessages, channelMessages } = require('./db');
 const { and, or, eq, asc } = require('drizzle-orm');
 
-const server = http.createServer(app);
+// Read SSL certs
+const sslOptions = {
+  key: fs.readFileSync(require('path').resolve(__dirname, '../ssl/key.pem')),
+  cert: fs.readFileSync(require('path').resolve(__dirname, '../ssl/cert.pem')),
+};
+
+// Replace http with https
+const server = https.createServer(sslOptions, app);
 const io = new Server(server, {
   cors: { origin: '*' }
 });

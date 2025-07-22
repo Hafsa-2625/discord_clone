@@ -11,7 +11,8 @@ export default function InviteJoinPage() {
     setJoining(true);
     setError("");
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const res = await fetch(`http://localhost:5000/api/invites/${inviteCode}/join`, {
+    const API_URL = import.meta.env.VITE_API_URL;
+    const res = await fetch(`${API_URL}/api/invites/${inviteCode}/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user.id }),

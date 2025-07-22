@@ -7,12 +7,13 @@ export function useFriendsList(userId: string, activeTab: 'all' | 'add-friend') 
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [friendUsername, setFriendUsername] = useState("");
   const [addFriendStatus, setAddFriendStatus] = useState("");
+  const API_URL = import.meta.env.VITE_API_URL;
 
   // Fetches the current user's friends list when the active tab is 'all'.
   useEffect(() => {
     if (activeTab === "all" && userId) {
       setFriendsLoading(true);
-      fetch(`http://localhost:5000/api/friends/list`, {
+      fetch(`${API_URL}/api/friends/list`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       })
         .then(res => res.json())
@@ -25,7 +26,7 @@ export function useFriendsList(userId: string, activeTab: 'all' | 'add-friend') 
   useEffect(() => {
     if (!userId) return;
     setRequestsLoading(true);
-    fetch("http://localhost:5000/api/friends/requests", {
+    fetch(`${API_URL}/api/friends/requests`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     })
       .then(res => res.json())
@@ -39,7 +40,7 @@ export function useFriendsList(userId: string, activeTab: 'all' | 'add-friend') 
     setAddFriendStatus("");
     setFriendsLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/friends/request", {
+      const res = await fetch(`${API_URL}/api/friends/request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -63,7 +64,7 @@ export function useFriendsList(userId: string, activeTab: 'all' | 'add-friend') 
 
   // Handler for accepting/declining a friend request
   const handleRespond = async (requestId: string, action: string) => {
-    await fetch("http://localhost:5000/api/friends/respond", {
+    await fetch(`${API_URL}/api/friends/respond`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -81,7 +82,7 @@ export function useFriendsList(userId: string, activeTab: 'all' | 'add-friend') 
   // Utility to refresh friends list
   const refreshFriendsList = () => {
     setFriendsLoading(true);
-    fetch(`http://localhost:5000/api/friends/list`, {
+    fetch(`${API_URL}/api/friends/list`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     })
       .then(res => res.json())

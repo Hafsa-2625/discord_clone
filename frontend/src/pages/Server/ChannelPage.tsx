@@ -25,7 +25,8 @@ export default function ChannelPage() {
   useEffect(() => {
     if (!channelId) return;
     setLoading(true);
-    fetch(`http://localhost:5000/api/channels/${channelId}`)
+    const API_URL = import.meta.env.VITE_API_URL;
+    fetch(`${API_URL}/api/channels/${channelId}`)
       .then((res) => {
         if (!res.ok) throw new Error("Channel not found");
         return res.json();
@@ -38,9 +39,10 @@ export default function ChannelPage() {
   // Fetch channel messages and attachments
   useEffect(() => {
     if (!channelId) return;
+    const API_URL = import.meta.env.VITE_API_URL;
     Promise.all([
-      fetch(`http://localhost:5000/api/channels/${channelId}/messages`).then(res => res.json()),
-      fetch(`http://localhost:5000/api/channels/${channelId}/attachments`).then(res => res.json()),
+      fetch(`${API_URL}/api/channels/${channelId}/messages`).then(res => res.json()),
+      fetch(`${API_URL}/api/channels/${channelId}/attachments`).then(res => res.json()),
     ])
       .then(([msgs, atts]) => {
         // Normalize both arrays to have created_at and sort
@@ -79,10 +81,11 @@ export default function ChannelPage() {
     if (!file || !channelId) return;
     setUploading(true);
     try {
+      const API_URL = import.meta.env.VITE_API_URL;
       const formData = new FormData();
       formData.append('file', file);
       formData.append('userId', user.id);
-      const res = await fetch(`http://localhost:5000/api/channels/${channelId}/attachments`, {
+      const res = await fetch(`${API_URL}/api/channels/${channelId}/attachments`, {
         method: 'POST',
         body: formData,
       });

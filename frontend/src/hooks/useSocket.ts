@@ -6,7 +6,7 @@ export function useSocket(user: any, friends: {id: string, name: string}[], dmLi
 
   useEffect(() => {
     if (!socketRef.current) {
-      socketRef.current = io('http://localhost:5000');
+      socketRef.current = io(import.meta.env.VITE_API_URL);
       socketRef.current.emit('join', user.id);
       socketRef.current.on('receive_dm', ({ senderId, message }: { senderId: string, message: string }) => {
         setMessages((msgs: any[]) => [...msgs, { senderId, message }]);

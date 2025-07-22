@@ -7,7 +7,7 @@ export function useChannelSocket(channelId: string, onMessage: (msg: any) => voi
   useEffect(() => {
     if (!channelId) return;
     if (!socketRef.current) {
-      socketRef.current = io('http://localhost:5000');
+      socketRef.current = io(import.meta.env.VITE_API_URL);
     }
     // Join channel room
     socketRef.current.emit('join_channel', channelId);

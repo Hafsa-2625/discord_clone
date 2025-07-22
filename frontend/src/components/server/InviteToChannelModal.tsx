@@ -43,7 +43,8 @@ const InviteToChannelModal: React.FC<InviteToChannelModalProps> = ({ open, onClo
     setLoading(l => ({ ...l, [friendId]: true }));
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      await fetch(`http://localhost:5000/api/channels/${channel.id}/invite`, {
+      const API_URL = import.meta.env.VITE_API_URL;
+      await fetch(`${API_URL}/api/channels/${channel.id}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteeId: Number(friendId), inviterId: Number(user.id) }),
