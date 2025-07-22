@@ -1,15 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { upload } = require('../utils/multerCloudinary');
-const dmController = require('../controllers/dmController');
+const { getDMSessions, uploadDMFile, getDMMessages, startCall, endCall } = require('../controllers/dmController');
 
-// GET /api/dms/list?userId=123 - get all DM sessions for the user
-router.get('/list', dmController.getDMSessions);
+router.get('/list', getDMSessions);
+router.post('/upload', upload.single('file'), uploadDMFile);
+router.get('/:sessionId/messages', getDMMessages);
+router.post('/:sessionId/call/start', startCall);
+router.post('/:sessionId/call/end', endCall);
 
-// DM file upload
-router.post('/upload', upload.single('file'), dmController.uploadDMFile);
-
-// GET /api/dms/:sessionId/messages - get all text and file messages for a DM session
-router.get('/:sessionId/messages', dmController.getDMMessages);
-
-module.exports = router; 
+module.exports = router;

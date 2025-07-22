@@ -2,6 +2,7 @@ const { db } = require('../db');
 const { messageSessions } = require('../db/messageSessionsSchema');
 const { dmAttachments } = require('../db/dmAttachmentsSchema');
 const { eq, or, and } = require('drizzle-orm');
+const { dmCallLogs } =require('../db/dmCallLogsSchema');
 
 async function getDMSessions(req, res) {
   const { userId } = req.query;
@@ -78,8 +79,27 @@ async function getDMMessages(req, res) {
       createdAt: file.createdAt,
       type: 'file',
     }));
+
+    // Fetch call logs for this session
+    const callLogs = await db.select().from(dmCallLogs)
+      .where(eq(dmCallLogs.sessionId, parseInt(sessionId, 10)));
+    // Map call logs to unified format
+    const formattedCallLogs = callLogs.map(log => ({
+      id: log.id,
+      senderId: log.callerId,
+      receiverId: log.receiverId,
+      createdAt: log.startedAt,
+      endedAt: log.endedAt,
+      status: log.status,
+      type: 'call',
+    }));
+
     // Combine and sort by createdAt
-    const allMessages = [...formattedTextMessages, ...formattedFileMessages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const allMessages = [
+      ...formattedTextMessages,
+      ...formattedFileMessages,
+      ...formattedCallLogs
+    ].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     res.json(allMessages);
   } catch (err) {
     console.error(err);
@@ -87,8 +107,37 @@ async function getDMMessages(req, res) {
   }
 }
 
+const startCall = async (req, res) => {
+  const { sessionId } = req.params;
+  const { callerId, receiverId } = req.body;
+  const startedAt = new Date();
+
+  const [callLog] = await db
+    .insert(dmCallLogs)
+    .values({ sessionId, callerId, receiverId, startedAt, status: "ongoing" })
+    .returning();
+
+  res.json({ callLog });
+};
+
+const endCall = async (req, res) => {
+  const { callLogId } = req.body;
+  const endedAt = new Date();
+
+  // Update the call log with endedAt and status
+  const [callLog] = await db
+    .update(dmCallLogs)
+    .set({ endedAt, status: "completed" })
+    .where(eq(dmCallLogs.id, callLogId))
+    .returning();
+
+  res.json({ callLog });
+};
+
 module.exports = {
   getDMSessions,
   uploadDMFile,
   getDMMessages,
-}; 
+  startCall,
+  endCall
+};

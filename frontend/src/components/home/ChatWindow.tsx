@@ -2,7 +2,7 @@ import { X, Plus, Gift, Image, Smile, Gamepad2, Phone, Video, Paperclip, Upload,
 import React, { useRef, useState, useEffect } from "react";
 import CallModal from "./CallModal";
 
-// --- Voice Call State Types ---
+// Voice Call State Types 
 type CallState = 'idle' | 'calling' | 'receiving' | 'in-call';
 
 interface FileMessage {
@@ -11,11 +11,17 @@ interface FileMessage {
   type: string;
 }
 
+interface CallLog {
+  endedAt?: string;
+  status?: string;
+}
+
 interface ChatMessage {
   senderId: string;
   message: string;
   createdAt?: string;
   file?: FileMessage;
+  call?: CallLog;
 }
 
 interface ChatWindowProps {
@@ -55,6 +61,7 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sessionIdCache, setSessionIdCache] = useState<{ [friendId: string]: number }>({});
+  const [currentCallLogId, setCurrentCallLogId] = useState<string | null>(null);
 
   // --- Voice Call State ---
   const [callState, setCallState] = useState<CallState>('idle');
@@ -66,10 +73,10 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
-  // --- WebRTC Config ---
+  // WebRTC Config 
   const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-  // --- Start Call ---
+  // Start Call 
   const startCall = async () => {
     setCallError(null);
     setCallState('calling');
@@ -116,13 +123,22 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
         from: user.id,
         offer
       });
+      // Call log: POST to backend
+      const API_URL = import.meta.env.VITE_API_URL;
+      const res = await fetch(`${API_URL}/api/dms/${activeChat.id}/call/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callerId: user.id, receiverId: activeChat.id }),
+      });
+      const data = await res.json();
+      setCurrentCallLogId(data.callLog.id);
     } catch (err) {
       setCallError('Could not start call: ' + (err as any).message);
       setCallState('idle');
     }
   };
 
-  // --- Accept Call ---
+  // Accept Call
   const acceptCall = async () => {
     setCallError(null);
     setCallState('in-call');
@@ -167,7 +183,7 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
   };
 
   // --- End Call ---
-  const endCall = () => {
+  const endCall = async () => {
     setCallState('idle');
     setCallFrom(null);
     setCallError(null);
@@ -187,6 +203,16 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
       to: callState === 'in-call' ? (callFrom || activeChat.id) : activeChat.id,
       from: user.id
     });
+    // --- Call log: POST to backend ---
+    if (currentCallLogId) {
+      const API_URL = import.meta.env.VITE_API_URL;
+      await fetch(`${API_URL}/api/dms/${activeChat.id}/call/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callLogId: currentCallLogId }),
+      });
+      setCurrentCallLogId(null);
+    }
   };
 
   // --- Decline Call ---
@@ -337,6 +363,16 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
                 type: m.fileType,
               },
             };
+          } else if (m.type === 'call') {
+            return {
+              senderId: m.senderId.toString(),
+              message: '',
+              createdAt: m.createdAt,
+              call: {
+                endedAt: m.endedAt,
+                status: m.status,
+              },
+            };
           }
           return null;
         }).filter(Boolean));
@@ -422,97 +458,103 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
       {/* Main chat UI, only show if not in call modal */}
       {callState === 'idle' && (
         <>
-          <div className="flex items-center px-6 py-4 border-b border-[#23272a] bg-[#313338]">
-            <img src="/discord.png" alt="avatar" className="w-8 h-8 rounded-full bg-[#5865f2] mr-3" />
-            <span className="font-bold text-lg">{activeChat.name}</span>
-            <div className="flex gap-2 ml-auto">
-              {/* --- Voice Call Button --- */}
-              <button
-                className="p-2 hover:bg-[#23272a] rounded-full"
-                onClick={startCall}
-                disabled={callState !== 'idle'}
-                title={callState !== 'idle' ? 'Already in a call' : 'Start voice call'}
-              >
-                <Phone size={20} />
-              </button>
-              <button className="p-2 hover:bg-[#23272a] rounded-full"><Video size={20} /></button>
-              <button className="p-2 hover:bg-[#23272a] rounded-full"><Paperclip size={20} /></button>
-            </div>
-            <button className="ml-2 text-gray-400 hover:text-white" onClick={() => setActiveChat(null)}><X size={24} /></button>
-          </div>
+      <div className="flex items-center px-6 py-4 border-b border-[#23272a] bg-[#313338]">
+        <img src="/discord.png" alt="avatar" className="w-8 h-8 rounded-full bg-[#5865f2] mr-3" />
+        <span className="font-bold text-lg">{activeChat.name}</span>
+        <div className="flex gap-2 ml-auto">
+          {/* --- Voice Call Button --- */}
+          <button
+            className="p-2 hover:bg-[#23272a] rounded-full"
+            onClick={startCall}
+            disabled={callState !== 'idle'}
+            title={callState !== 'idle' ? 'Already in a call' : 'Start voice call'}
+          >
+            <Phone size={20} />
+          </button>
+          <button className="p-2 hover:bg-[#23272a] rounded-full"><Video size={20} /></button>
+          <button className="p-2 hover:bg-[#23272a] rounded-full"><Paperclip size={20} /></button>
+        </div>
+        <button className="ml-2 text-gray-400 hover:text-white" onClick={() => setActiveChat(null)}><X size={24} /></button>
+      </div>
+      <div
+        className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 bg-[#313338]"
+        style={{ display: 'flex', flexDirection: 'column-reverse' }}
+      >
+        {[...messages].reverse().map((msg, idx) => (
           <div
-            className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 bg-[#313338]"
-            style={{ display: 'flex', flexDirection: 'column-reverse' }}
+            key={idx}
+            className={`flex ${msg.senderId == user.id ? 'justify-end' : 'justify-start'}`}
           >
-            {[...messages].reverse().map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex ${msg.senderId == user.id ? 'justify-end' : 'justify-start'}`}
-              >
-                {msg.file ? (
-                  <div className="bg-[#23272a] rounded-lg p-4 max-w-xs">
-                    {isImageFile(msg.file.type) ? (
-                      <img src={msg.file.url} alt={msg.file.name} className="rounded mb-2 max-w-full max-h-48" />
-                    ) : null}
-                    <a href={msg.file.url} target="_blank" rel="noopener noreferrer" className="block text-white text-sm mt-1">{msg.file.name}</a>
-                  </div>
-                ) : (
-                  <div className={`px-4 py-2 rounded-lg ${msg.senderId == user.id ? 'bg-[#5865f2] text-white' : 'bg-[#23272a] text-gray-200'}`}>{msg.message}</div>
-                )}
+            {msg.call ? (
+              <div className="flex items-center gap-2 text-xs text-green-400 bg-[#23272a] rounded-lg px-3 py-2">
+                <Phone size={16} />
+                {msg.senderId == user.id ? 'You' : activeChat.name} started a call{msg.call.endedAt ? ' that lasted a few seconds.' : '...' }
+                {/* Optionally show time, status, etc. */}
               </div>
-            ))}
+            ) : msg.file ? (
+              <div className="bg-[#23272a] rounded-lg p-4 max-w-xs">
+                {isImageFile(msg.file.type) ? (
+                  <img src={msg.file.url} alt={msg.file.name} className="rounded mb-2 max-w-full max-h-48" />
+                ) : null}
+                <a href={msg.file.url} target="_blank" rel="noopener noreferrer" className="block text-white text-sm mt-1">{msg.file.name}</a>
+              </div>
+            ) : (
+              <div className={`px-4 py-2 rounded-lg ${msg.senderId == user.id ? 'bg-[#5865f2] text-white' : 'bg-[#23272a] text-gray-200'}`}>{msg.message}</div>
+            )}
           </div>
-          <form
-            className="flex items-center p-4 border-t border-[#23272a] bg-[#23272a] relative"
-            onSubmit={e => {
-              e.preventDefault();
-              if (newMessage.trim() && socketRef.current) {
-                socketRef.current.emit('send_dm', {
-                  senderId: user.id,
-                  receiverId: activeChat.id,
-                  message: newMessage
-                });
-                setMessages(msgs => [...msgs, { senderId: user.id, message: newMessage }]);
-                // Add to dmList if not already present
-                if (!dmList.some(dm => dm.id === activeChat.id)) {
-                  setDmList(list => [...list, { id: activeChat.id, name: activeChat.name }]);
-                }
-                setNewMessage('');
-              }
-            }}
-          >
-            <div className="dm-plus-menu-trigger relative">
-              <button type="button" className="p-2 hover:bg-[#313338] rounded-full" onClick={() => setPlusMenuOpen(v => !v)}>
-                <Plus size={20} />
-              </button>
-              {plusMenuOpen && (
-                <DmPlusMenu
-                  onUploadFile={() => fileInputRef.current?.click()}
-                  onClose={() => setPlusMenuOpen(false)}
-                />
-              )}
-            </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              onChange={handleFileSelect}
-              accept="image/*,application/pdf,application/zip,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        ))}
+      </div>
+      <form
+        className="flex items-center p-4 border-t border-[#23272a] bg-[#23272a] relative"
+        onSubmit={e => {
+          e.preventDefault();
+          if (newMessage.trim() && socketRef.current) {
+            socketRef.current.emit('send_dm', {
+              senderId: user.id,
+              receiverId: activeChat.id,
+              message: newMessage
+            });
+            setMessages(msgs => [...msgs, { senderId: user.id, message: newMessage }]);
+            // Add to dmList if not already present
+            if (!dmList.some(dm => dm.id === activeChat.id)) {
+              setDmList(list => [...list, { id: activeChat.id, name: activeChat.name }]);
+            }
+            setNewMessage('');
+          }
+        }}
+      >
+        <div className="dm-plus-menu-trigger relative">
+          <button type="button" className="p-2 hover:bg-[#313338] rounded-full" onClick={() => setPlusMenuOpen(v => !v)}>
+            <Plus size={20} />
+          </button>
+          {plusMenuOpen && (
+            <DmPlusMenu
+              onUploadFile={() => fileInputRef.current?.click()}
+              onClose={() => setPlusMenuOpen(false)}
             />
-            <input
-              className="flex-1 bg-[#313338] rounded-full px-4 py-2 text-white focus:outline-none mx-2"
-              placeholder={`Message @${activeChat.name}`}
-              value={newMessage}
-              onChange={e => setNewMessage(e.target.value)}
-            />
-            <div className="flex gap-1">
-              <button type="button" className="p-2 hover:bg-[#313338] rounded-full"><Gift size={20} /></button>
-              <button type="button" className="p-2 hover:bg-[#313338] rounded-full"><Image size={20} /></button>
-              <button type="button" className="p-2 hover:bg-[#313338] rounded-full"><Smile size={20} /></button>
-              <button type="button" className="p-2 hover:bg-[#313338] rounded-full"><Gamepad2 size={20} /></button>
-            </div>
-            <button type="submit" className="ml-2 px-4 py-2 bg-[#5865f2] text-white rounded-lg font-bold">Send</button>
-          </form>
+          )}
+        </div>
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          onChange={handleFileSelect}
+          accept="image/*,application/pdf,application/zip,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        />
+        <input
+          className="flex-1 bg-[#313338] rounded-full px-4 py-2 text-white focus:outline-none mx-2"
+          placeholder={`Message @${activeChat.name}`}
+          value={newMessage}
+          onChange={e => setNewMessage(e.target.value)}
+        />
+        <div className="flex gap-1">
+          <button type="button" className="p-2 hover:bg-[#313338] rounded-full"><Gift size={20} /></button>
+          <button type="button" className="p-2 hover:bg-[#313338] rounded-full"><Image size={20} /></button>
+          <button type="button" className="p-2 hover:bg-[#313338] rounded-full"><Smile size={20} /></button>
+          <button type="button" className="p-2 hover:bg-[#313338] rounded-full"><Gamepad2 size={20} /></button>
+        </div>
+        <button type="submit" className="ml-2 px-4 py-2 bg-[#5865f2] text-white rounded-lg font-bold">Send</button>
+      </form>
         </>
       )}
       {/* Always render the audio element for remote stream */}
