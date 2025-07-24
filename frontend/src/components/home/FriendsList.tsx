@@ -6,9 +6,10 @@ interface FriendsListProps {
   incomingRequests: any[];
   requestsLoading: boolean;
   handleRespond: (requestId: string, action: string) => void;
+  handleUnfriend: (friendId: string) => void;
 }
 
-export default function FriendsList({ friends, friendsLoading, incomingRequests, requestsLoading, handleRespond }: FriendsListProps) {
+export default function FriendsList({ friends, friendsLoading, incomingRequests, requestsLoading, handleRespond, handleUnfriend }: FriendsListProps) {
   return (
     <div className="flex-1 w-full px-8 py-6">
       {requestsLoading ? (
@@ -31,9 +32,25 @@ export default function FriendsList({ friends, friendsLoading, incomingRequests,
         <div>
           <div className="font-bold mb-2">All Friends</div>
           {friends.map(friend => (
-            <div key={friend.id} className="flex items-center gap-4 bg-[#23272a] rounded-lg p-3 mb-2">
-              <div className="font-semibold">{friend.name}</div>
-              <span className="text-xs text-gray-400">{friend.status}</span>
+            <div key={friend.id} className="flex items-center justify-between bg-[#23272a] rounded-lg p-3 mb-2">
+              <div className="flex items-center gap-4">
+                <div className="font-semibold">{friend.name}</div>
+                <span className="text-xs text-gray-400">{friend.status}</span>
+              </div>
+              <button 
+                onClick={() => {
+                  if (window.confirm(`Are you sure you want to unfriend ${friend.name}?`)) {
+                    handleUnfriend(friend.id);
+                  }
+                }} 
+                className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-900/20 transition-colors"
+                title="Unfriend"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 7H18V6C18 3.79 16.21 2 14 2H10C7.79 2 6 3.79 6 6V7H5C4.45 7 4 7.45 4 8S4.45 9 5 9H6V19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V9H19C19.55 9 20 8.55 20 8S19.55 7 19 7ZM8 6C8 4.9 8.9 4 10 4H14C15.1 4 16 4.9 16 6V7H8V6ZM16 19H8V9H16V19Z"/>
+                  <path d="M10 11V17H12V11H10ZM14 11V17H16V11H14Z"/>
+                </svg>
+              </button>
             </div>
           ))}
         </div>

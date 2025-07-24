@@ -1,6 +1,8 @@
-import { X, Plus, Gift, Image, Smile, Gamepad2, Phone, Video, Paperclip, Upload, BarChart2, Grid } from "lucide-react";
+// Video Call Overlay Component
 import React, { useRef, useState, useEffect } from "react";
 import CallModal from "./CallModal";
+import VideoCallOverlay from "./VideoCallOverlay";
+import { X, Plus, Gift, Image, Smile, Gamepad2, Phone, Video, Paperclip, Upload, BarChart2, Grid } from "lucide-react";
 
 // Voice Call State Types 
 type CallState = 'idle' | 'calling' | 'receiving' | 'in-call';
@@ -14,6 +16,7 @@ interface FileMessage {
 interface CallLog {
   endedAt?: string;
   status?: string;
+  callType?: 'audio' | 'video';
 }
 
 interface ChatMessage {
@@ -58,40 +61,41 @@ function isImageFile(type: string) {
 }
 
 export default function ChatWindow({ activeChat, messages, newMessage, setNewMessage, user, socketRef, setMessages, dmList, setDmList, setActiveChat }: ChatWindowProps) {
-  const [plusMenuOpen, setPlusMenuOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [sessionIdCache, setSessionIdCache] = useState<{ [friendId: string]: number }>({});
-  const [currentCallLogId, setCurrentCallLogId] = useState<string | null>(null);
+const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+const fileInputRef = useRef<HTMLInputElement>(null);
+const [sessionIdCache, setSessionIdCache] = useState<{ [friendId: string]: number }>({});
+const [currentCallLogId, setCurrentCallLogId] = useState<string | null>(null);
+const [callType, setCallType] = useState<'audio' | 'video'>('audio');
+const localVideoRef = useRef<HTMLVideoElement>(null);
+const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  // --- Voice Call State ---
+  // Voice Call State 
   const [callState, setCallState] = useState<CallState>('idle');
   const [callFrom, setCallFrom] = useState<string | null>(null); // userId of caller
-  const [callError, setCallError] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
+  // const [isMuted, setIsMuted] = useState(false);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const iceCandidateQueue = useRef<RTCIceCandidate[]>([]); // Queue for early ICE candidates
 
   // WebRTC Config 
   const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-  // Start Call 
+  // Start Call (Audio) 
   const startCall = async () => {
-    setCallError(null);
+    setCallType('audio');
     setCallState('calling');
     try {
       const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = localStream;
       const pc = new RTCPeerConnection(rtcConfig);
       peerConnectionRef.current = pc;
-      // Add local tracks BEFORE creating offer
       localStream.getTracks().forEach(track => {
         pc.addTrack(track, localStream);
       });
       pc.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log('Local ICE candidate:', event.candidate);
           socketRef.current.emit('call:ice-candidate', {
             to: activeChat.id,
             from: user.id,
@@ -99,21 +103,74 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
           });
         }
       };
-      pc.oniceconnectionstatechange = () => {
-        if (pc) {
-          console.log('ICE connection state:', pc.iceConnectionState);
+      pc.ontrack = (event: RTCTrackEvent) => {
+        remoteStreamRef.current = event.streams[0];
+        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = event.streams[0];
+      };
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socketRef.current.emit('call:offer', {
+        to: activeChat.id,
+        from: user.id,
+        offer,
+        callType: 'audio',
+      });
+      // Call log: POST to backend 
+      const API_URL = import.meta.env.VITE_API_URL;
+      const res = await fetch(`${API_URL}/api/dms/${activeChat.id}/call/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callerId: user.id, receiverId: activeChat.id, callType: 'audio' }),
+      });
+      const data = await res.json();
+      setCurrentCallLogId(data.callLog.id);
+    } catch (err) {
+      setCallState('idle');
+    }
+  };
+
+  // Start Video Call 
+  const startVideoCall = async () => {
+    setCallType('video');
+    setCallState('calling');
+    try {
+      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      localStreamRef.current = localStream;
+      
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = localStream;
+      }
+      
+      const pc = new RTCPeerConnection(rtcConfig);
+      peerConnectionRef.current = pc;
+      localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
+      });
+      
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socketRef.current.emit('call:ice-candidate', {
+            to: activeChat.id,
+            from: user.id,
+            candidate: event.candidate
+          });
         }
       };
-      pc.onsignalingstatechange = () => {
-        if (pc) {
-          console.log('Signaling state:', pc.signalingState);
-        }
+      
+      pc.oniceconnectionstatechange = () => {
+        // Connection state monitoring (can be expanded if needed)
+      };
+      
+      pc.onconnectionstatechange = () => {
+        // Connection state monitoring (can be expanded if needed)
       };
       pc.ontrack = (event: RTCTrackEvent) => {
-        console.log('Received remote track', event.streams[0]);
-        remoteStreamRef.current = event.streams[0];
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = event.streams[0];
+        if (event.streams && event.streams[0]) {
+          remoteStreamRef.current = event.streams[0];
+          
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+          }
         }
       };
       const offer = await pc.createOffer();
@@ -121,72 +178,82 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
       socketRef.current.emit('call:offer', {
         to: activeChat.id,
         from: user.id,
-        offer
+        offer,
+        callType: 'video',
       });
-      // Call log: POST to backend
+      // Call log: POST to backend 
       const API_URL = import.meta.env.VITE_API_URL;
       const res = await fetch(`${API_URL}/api/dms/${activeChat.id}/call/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ callerId: user.id, receiverId: activeChat.id }),
+        body: JSON.stringify({ callerId: user.id, receiverId: activeChat.id, callType: 'video' }),
       });
       const data = await res.json();
       setCurrentCallLogId(data.callLog.id);
     } catch (err) {
-      setCallError('Could not start call: ' + (err as any).message);
       setCallState('idle');
     }
   };
 
-  // Accept Call
-  const acceptCall = async () => {
-    setCallError(null);
-    setCallState('in-call');
-    try {
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      localStreamRef.current = localStream;
-      const pc = new RTCPeerConnection(rtcConfig);
-      peerConnectionRef.current = pc;
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          console.log('Local ICE candidate:', event.candidate);
-          socketRef.current.emit('call:ice-candidate', {
-            to: callFrom,
-            from: user.id,
-            candidate: event.candidate
-          });
-        }
-      };
-      pc.oniceconnectionstatechange = () => {
-        if (pc) {
-          console.log('ICE connection state:', pc.iceConnectionState);
-        }
-      };
-      pc.onsignalingstatechange = () => {
-        if (pc) {
-          console.log('Signaling state:', pc.signalingState);
-        }
-      };
-      pc.ontrack = (event: RTCTrackEvent) => {
-        console.log('Received remote track', event.streams[0]);
+// Accept Call
+const acceptCall = async () => {
+  setCallState('in-call');
+  try {
+    // Request correct media based on callType
+    const constraints = callType === 'video' ? { audio: true, video: true } : { audio: true };
+    
+    const localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    localStreamRef.current = localStream;
+    
+    // Always assign local video for video calls
+    if (callType === 'video' && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream;
+    }
+    
+    const pc = new RTCPeerConnection(rtcConfig);
+    peerConnectionRef.current = pc;
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socketRef.current.emit('call:ice-candidate', {
+          to: callFrom,
+          from: user.id,
+          candidate: event.candidate
+        });
+      }
+    };
+    pc.oniceconnectionstatechange = () => {
+      // Connection state monitoring
+    };
+    pc.onsignalingstatechange = () => {
+      // Signaling state monitoring
+    };
+    pc.ontrack = (event: RTCTrackEvent) => {
+      if (event.streams && event.streams[0]) {
         remoteStreamRef.current = event.streams[0];
-        if (remoteAudioRef.current) {
+        
+        // Always assign remote video for video calls
+        if (callType === 'video' && remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+        } else if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = event.streams[0];
         }
-      };
-      // Wait for offer to be set as remote desc in handler below
-    } catch (err) {
-      setCallError('Could not accept call: ' + (err as any).message);
-      setCallState('idle');
-    }
-  };
+      }
+    };
+    // Wait for offer to be set as remote desc in handler below
+  } catch (err) {
+    setCallState('idle');
+  }
+};
 
-  // --- End Call ---
-  const endCall = async () => {
+  // End Call 
+  const endCall = async (shouldNotifyPeer: boolean = true) => {
     setCallState('idle');
     setCallFrom(null);
-    setCallError(null);
+    
+    // Clear ICE candidate queue
+    iceCandidateQueue.current = [];
+    
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
@@ -198,12 +265,14 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = null;
     }
-    // Notify peer
-    socketRef.current.emit('call:end', {
-      to: callState === 'in-call' ? (callFrom || activeChat.id) : activeChat.id,
-      from: user.id
-    });
-    // --- Call log: POST to backend ---
+    // Only notify peer if this is initiated by the user, not in response to receiving call:end
+    if (shouldNotifyPeer) {
+      socketRef.current.emit('call:end', {
+        to: callState === 'in-call' ? (callFrom || activeChat.id) : activeChat.id,
+        from: user.id
+      });
+    }
+    // Call log: POST to backend 
     if (currentCallLogId) {
       const API_URL = import.meta.env.VITE_API_URL;
       await fetch(`${API_URL}/api/dms/${activeChat.id}/call/end`, {
@@ -215,98 +284,139 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
     }
   };
 
-  // --- Decline Call ---
+  // Decline Call 
   const declineCall = () => {
     setCallState('idle');
     setCallFrom(null);
-    setCallError(null);
     socketRef.current.emit('call:end', {
       to: callFrom,
       from: user.id
     });
   };
 
-  // --- Socket Event Handlers ---
-  useEffect(() => {
-    if (!socketRef.current) return;
-    // --- Incoming Offer ---
-    const handleOffer = async ({ from, offer }: { from: string, offer: any }) => {
-      setCallFrom(from);
+// --- In your socket event handler for incoming offers ---
+useEffect(() => {
+  if (!socketRef.current) return;
+  // Incoming Offer 
+  const handleOffer = async ({ offer, from, callType: incomingCallType }: { offer: any; from: string; callType: 'audio' | 'video' }) => {
+    setCallFrom(from);
+    setCallType(incomingCallType);
+    
+    // Set call state FIRST to render VideoCallOverlay and create video elements
+    if (incomingCallType === 'video') {
+      setCallState('calling');
+    } else {
       setCallState('receiving');
-      // Create peer connection
-      const pc = new RTCPeerConnection(rtcConfig);
-      peerConnectionRef.current = pc;
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          console.log('Local ICE candidate:', event.candidate);
-          socketRef.current.emit('call:ice-candidate', {
-            to: from,
-            from: user.id,
-            candidate: event.candidate
-          });
-        }
-      };
-      pc.oniceconnectionstatechange = () => {
-        if (pc) {
-          console.log('ICE connection state:', pc.iceConnectionState);
-        }
-      };
-      pc.onsignalingstatechange = () => {
-        if (pc) {
-          console.log('Signaling state:', pc.signalingState);
-        }
-      };
-      pc.ontrack = (event: RTCTrackEvent) => {
-        console.log('Received remote track', event.streams[0]);
+    }
+    
+    // Wait a brief moment for the VideoCallOverlay to render and video refs to be available
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // 1. Create peer connection
+    const pc = new RTCPeerConnection(rtcConfig);
+    peerConnectionRef.current = pc;
+    
+    // Set up ontrack handler EARLY to catch incoming streams
+    pc.ontrack = (event: RTCTrackEvent) => {
+      if (event.streams && event.streams[0]) {
         remoteStreamRef.current = event.streams[0];
-        if (remoteAudioRef.current) {
+        
+        // Always assign remote video for video calls
+        if (incomingCallType === 'video' && remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+        } else if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = event.streams[0];
         }
-      };
-      // --- Add local audio tracks before setting remote description ---
-      let localStream = localStreamRef.current;
-      if (!localStream) {
-        try {
-          localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          localStreamRef.current = localStream;
-        } catch (err) {
-          setCallError('Could not access microphone: ' + (err as any).message);
-          return;
-        }
       }
-      localStream.getTracks().forEach(track => {
-        pc.addTrack(track, localStream!);
-      });
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      // --- Immediately create and send answer ---
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      socketRef.current.emit('call:answer', {
-        to: from,
-        from: user.id,
-        answer
-      });
     };
-    // --- Incoming Answer ---
-    const handleAnswer = async ({ from, answer }: { from: string, answer: any }) => {
+    // 2. Get local stream and add tracks
+    let localStream = localStreamRef.current;
+    if (!localStream) {
+      try {
+        const constraints = incomingCallType === 'video' ? { audio: true, video: true } : { audio: true };
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        localStreamRef.current = localStream;
+        // Always assign local video for video calls
+        if (incomingCallType === 'video' && localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream;
+        }
+      } catch (err) {
+        return;
+      }
+    }
+    // Always add all tracks to peer connection
+    localStream.getTracks().forEach(track => {
+      pc.addTrack(track, localStream!);
+    });
+    
+    // 4. Set remote description (offer)
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    
+    // Process any queued ICE candidates now that remote description is set
+    for (const candidate of iceCandidateQueue.current) {
+      try {
+        await pc.addIceCandidate(candidate);
+      } catch (err) {
+        // Handle silently or log if needed
+      }
+    }
+    iceCandidateQueue.current = []; // Clear the queue
+    
+    // 5. Create and set local answer
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    
+    // 6. Send answer
+    socketRef.current.emit('call:answer', {
+      to: from,
+      from: user.id,
+      answer
+    });
+    
+    // ICE candidate handler
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socketRef.current.emit('call:ice-candidate', {
+          to: from,
+          from: user.id,
+          candidate: event.candidate
+        });
+      }
+    };
+    pc.oniceconnectionstatechange = () => {
+      // Connection state monitoring
+    };
+    pc.onsignalingstatechange = () => {
+      // Signaling state monitoring
+    };
+  };
+    // Incoming Answer 
+    const handleAnswer = async ({ answer }: { answer: any }) => {
       if (peerConnectionRef.current) {
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
         setCallState('in-call');
       }
     };
-    // --- Incoming ICE Candidate ---
-    const handleIceCandidate = async ({ from, candidate }: { from: string, candidate: any }) => {
-      if (peerConnectionRef.current && candidate) {
+    // Incoming ICE Candidate 
+    const handleIceCandidate = async ({ candidate }: { candidate: any }) => {
+      if (!candidate) {
+        return;
+      }
+      
+      if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
         try {
           await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (err) {
-          // Ignore
+          // Handle silently or log if needed
         }
+      } else {
+        // Queue the ICE candidate for later
+        iceCandidateQueue.current.push(new RTCIceCandidate(candidate));
       }
     };
-    // --- Incoming Call End ---
-    const handleCallEnd = ({ from }: { from: string }) => {
-      endCall();
+    // Incoming Call End 
+    const handleCallEnd = () => {
+      endCall(false); // Don't notify peer - we're responding to their call:end event
     };
     socketRef.current.on('call:offer', handleOffer);
     socketRef.current.on('call:answer', handleAnswer);
@@ -444,8 +554,17 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* Render CallModal for call states other than 'idle' */}
-      {callState !== 'idle' && (
+      {/* Always render VideoCallOverlay for video calls if callState !== 'idle' */}
+      {callType === 'video' && callState !== 'idle' ? (
+        <VideoCallOverlay
+          localVideoRef={localVideoRef}
+          remoteVideoRef={remoteVideoRef}
+          onEnd={endCall}
+          callState={callState}
+          remoteName={activeChat.name}
+          localName={user.name}
+        />
+      ) : callState !== 'idle' && (
         <CallModal
           callState={callState as any}
           localUser={{ id: user.id, name: user.name || user.id, avatarUrl: "/discord.png" }}
@@ -471,7 +590,14 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
           >
             <Phone size={20} />
           </button>
-          <button className="p-2 hover:bg-[#23272a] rounded-full"><Video size={20} /></button>
+          <button
+            className="p-2 hover:bg-[#23272a] rounded-full"
+            onClick={startVideoCall}
+            disabled={callState !== 'idle'}
+            title={callState !== 'idle' ? 'Already in a call' : 'Start video call'}
+          >
+            <Video size={20} />
+          </button>
           <button className="p-2 hover:bg-[#23272a] rounded-full"><Paperclip size={20} /></button>
         </div>
         <button className="ml-2 text-gray-400 hover:text-white" onClick={() => setActiveChat(null)}><X size={24} /></button>
@@ -487,9 +613,8 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
           >
             {msg.call ? (
               <div className="flex items-center gap-2 text-xs text-green-400 bg-[#23272a] rounded-lg px-3 py-2">
-                <Phone size={16} />
-                {msg.senderId == user.id ? 'You' : activeChat.name} started a call{msg.call.endedAt ? ' that lasted a few seconds.' : '...' }
-                {/* Optionally show time, status, etc. */}
+                {msg.call?.callType === 'video' ? <Video size={16} /> : <Phone size={16} />}
+                {msg.senderId == user.id ? 'You' : activeChat.name} started a {msg.call?.callType === 'video' ? 'video' : 'voice'} call{msg.call.endedAt ? ' that lasted a few seconds.' : '...' }
               </div>
             ) : msg.file ? (
               <div className="bg-[#23272a] rounded-lg p-4 max-w-xs">
@@ -557,7 +682,7 @@ export default function ChatWindow({ activeChat, messages, newMessage, setNewMes
       </form>
         </>
       )}
-      {/* Always render the audio element for remote stream */}
+      {/* Always render the audio element for remote stream, but hide video elements (handled by overlay) */}
       <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
     </div>
   );

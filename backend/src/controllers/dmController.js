@@ -91,6 +91,7 @@ async function getDMMessages(req, res) {
       createdAt: log.startedAt,
       endedAt: log.endedAt,
       status: log.status,
+      callType: log.callType,
       type: 'call',
     }));
 
@@ -109,12 +110,12 @@ async function getDMMessages(req, res) {
 
 const startCall = async (req, res) => {
   const { sessionId } = req.params;
-  const { callerId, receiverId } = req.body;
+  const { callerId, receiverId, callType } = req.body;
   const startedAt = new Date();
 
   const [callLog] = await db
     .insert(dmCallLogs)
-    .values({ sessionId, callerId, receiverId, startedAt, status: "ongoing" })
+    .values({ sessionId, callerId, receiverId, startedAt, status: "ongoing", callType })
     .returning();
 
   res.json({ callLog });

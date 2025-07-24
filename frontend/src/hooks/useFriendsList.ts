@@ -90,6 +90,30 @@ export function useFriendsList(userId: string, activeTab: 'all' | 'add-friend') 
       .finally(() => setFriendsLoading(false));
   };
 
+  // Handler for unfriending someone
+  const handleUnfriend = async (friendId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/friends/unfriend`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ friendId }),
+      });
+      
+      if (res.ok) {
+        // Remove friend from local state immediately
+        setFriends(friends => friends.filter(friend => friend.id !== friendId));
+      } else {
+        const data = await res.json();
+        console.error('Failed to unfriend:', data.message);
+      }
+    } catch (error) {
+      console.error('Error unfriending:', error);
+    }
+  };
+
   return {
     friends,
     friendsLoading,
@@ -102,5 +126,6 @@ export function useFriendsList(userId: string, activeTab: 'all' | 'add-friend') 
     handleSendFriendRequest,
     handleRespond,
     refreshFriendsList,
+    handleUnfriend,
   };
 } 

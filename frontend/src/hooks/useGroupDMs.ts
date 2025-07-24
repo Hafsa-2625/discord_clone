@@ -29,6 +29,33 @@ export function useGroupDMs(user: any) {
   const handleCreateGroupDM = () => setShowGroupDmModal(true);
   const handleCloseGroupDmModal = () => setShowGroupDmModal(false);
 
+  // Handler for leaving a group DM
+  const handleLeaveGroupDM = async (groupId: number) => {
+    try {
+      const res = await fetch(`${API_URL}/api/group-dms/${groupId}/leave`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      
+      if (res.ok) {
+        // Remove group DM from local state
+        setGroupDMs(prevGroups => prevGroups.filter(group => group.id !== groupId));
+        // If the active group DM is the one being left, clear it
+        if (activeGroupDM && activeGroupDM.id === groupId) {
+          setActiveGroupDM(null);
+          setGroupMessages([]);
+        }
+      } else {
+        const data = await res.json();
+        console.error('Failed to leave group DM:', data.error);
+      }
+    } catch (error) {
+      console.error('Error leaving group DM:', error);
+    }
+  };
+
   return {
     groupDMs,
     setGroupDMs,
@@ -42,5 +69,6 @@ export function useGroupDMs(user: any) {
     handleCreateGroupDM,
     handleCloseGroupDmModal,
     handleSelectGroupDM,
+    handleLeaveGroupDM,
   };
 } 

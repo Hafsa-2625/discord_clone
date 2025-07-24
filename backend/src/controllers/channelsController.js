@@ -106,12 +106,9 @@ async function sendChannelInvite(req, res) {
 // Get pending invites for a user
 async function getChannelInvites(req, res) {
   try {
-    console.log('getChannelInvites - req.query:', req.query);
     const { userId } = req.query;
     const parsedUserId = parseInt(userId, 10);
-    console.log('getChannelInvites - userId:', userId, 'parsedUserId:', parsedUserId);
     if (isNaN(parsedUserId)) {
-      console.log('getChannelInvites - Invalid userId:', userId);
       return res.status(400).json({ error: 'Invalid userId' });
     }
     const invites = await db.select().from(channelInvites)

@@ -20,6 +20,24 @@ const io = new Server(server, {
 // Store online users: { userId: socketId }
 const onlineUsers = {};
 
+// Rate limiting for call events to prevent spam/loops
+const callEventLimiter = new Map(); // userId -> { lastCallEnd: timestamp }
+
+const shouldAllowCallEvent = (userId, eventType) => {
+  if (eventType !== 'call:end') return true; // Only limit call:end events
+  
+  const now = Date.now();
+  const userLimits = callEventLimiter.get(userId) || {};
+  
+  // Allow only one call:end per second per user
+  if (userLimits.lastCallEnd && (now - userLimits.lastCallEnd) < 1000) {
+    return false;
+  }
+  
+  callEventLimiter.set(userId, { ...userLimits, lastCallEnd: now });
+  return true;
+};
+
 io.on('connection', (socket) => {
   // User joins with their userId
   socket.on('join', (userId) => {
@@ -108,10 +126,10 @@ io.on('connection', (socket) => {
   });
 
   // Relay offer
-  socket.on('call:offer', ({ to, offer, from }) => {
+  socket.on('call:offer', ({ to, offer, from, callType }) => {
     const receiverSocketId = onlineUsers[to];
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit('call:offer', { from, offer });
+      io.to(receiverSocketId).emit('call:offer', { from, offer, callType });
     }
   });
 
@@ -133,6 +151,11 @@ io.on('connection', (socket) => {
 
   // Relay call end
   socket.on('call:end', ({ to, from }) => {
+    // Rate limit to prevent infinite loops
+    if (!shouldAllowCallEvent(from, 'call:end')) {
+      return;
+    }
+    
     const receiverSocketId = onlineUsers[to];
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('call:end', { from });

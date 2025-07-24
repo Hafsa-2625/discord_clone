@@ -66,4 +66,27 @@ exports.getFriends = async (req, res) => {
     createdAt: u.createdAt,
   }));
   res.json(result);
+};
+
+exports.unfriend = async (req, res) => {
+  const userId = req.user.id;
+  const { friendId } = req.body;
+  
+  if (!friendId) return res.status(400).json({ message: 'Friend ID is required.' });
+  if (friendId === userId) return res.status(400).json({ message: 'Cannot unfriend yourself.' });
+  
+  try {
+    
+    await db.delete(friends).where(
+      and(eq(friends.userId, userId), eq(friends.friendId, friendId))
+    );
+    await db.delete(friends).where(
+      and(eq(friends.userId, friendId), eq(friends.friendId, userId))
+    );
+    
+    res.json({ message: 'Friend removed successfully.' });
+  } catch (error) {
+    console.error('Error unfriending:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
 }; 

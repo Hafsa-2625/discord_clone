@@ -36,6 +36,7 @@ export default function Home() {
     addFriendStatus,
     handleSendFriendRequest,
     handleRespond,
+    handleUnfriend,
   } = useFriendsList(user.id, activeTab);
 
 const {
@@ -64,6 +65,7 @@ const {
     handleCreateGroupDM,
     handleCloseGroupDmModal,
     handleSelectGroupDM,
+    handleLeaveGroupDM,
   } = useGroupDMs(user);
 
   const { socketRef } = useSocket(user, friends, dmList, setMessages, setDmList);
@@ -182,14 +184,33 @@ const {
                 {groupDMs.map(gdm => (
                   <div
                     key={gdm.id}
-                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-[#313338] ${activeGroupDM?.id === gdm.id ? 'bg-[#404249]' : ''}`}
-                    onClick={() => handleSelectGroupDMExclusive(gdm.id)}
+                    className={`group flex items-center justify-between gap-3 p-2 rounded-lg cursor-pointer hover:bg-[#313338] ${activeGroupDM?.id === gdm.id ? 'bg-[#404249]' : ''}`}
                   >
-                    <img src={gdm.imageUrl || "/discord.png"} alt="group avatar" className="w-8 h-8 rounded-full bg-[#5865f2]" />
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-bold truncate">{gdm.name}</span>
-                      <span className="text-xs text-gray-400">{gdm.members?.length || 0} Members</span>
+                    <div 
+                      className="flex items-center gap-3 flex-1 min-w-0"
+                      onClick={() => handleSelectGroupDMExclusive(gdm.id)}
+                    >
+                      <img src={gdm.imageUrl || "/discord.png"} alt="group avatar" className="w-8 h-8 rounded-full bg-[#5865f2]" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-bold truncate">{gdm.name}</span>
+                        <span className="text-xs text-gray-400">{gdm.members?.length || 0} Members</span>
+                      </div>
                     </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Are you sure you want to leave "${gdm.name}"?`)) {
+                          handleLeaveGroupDM(gdm.id);
+                        }
+                      }} 
+                      className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Leave Group DM"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 7H18V6C18 3.79 16.21 2 14 2H10C7.79 2 6 3.79 6 6V7H5C4.45 7 4 7.45 4 8S4.45 9 5 9H6V19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19V9H19C19.55 9 20 8.55 20 8S19.55 7 19 7ZM8 6C8 4.9 8.9 4 10 4H14C15.1 4 16 4.9 16 6V7H8V6ZM16 19H8V9H16V19Z"/>
+                        <path d="M10 11V17H12V11H10ZM14 11V17H16V11H14Z"/>
+                      </svg>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -272,6 +293,7 @@ const {
             incomingRequests={incomingRequests}
             requestsLoading={requestsLoading}
             handleRespond={handleRespond}
+            handleUnfriend={handleUnfriend}
           />
         )}
       </main>

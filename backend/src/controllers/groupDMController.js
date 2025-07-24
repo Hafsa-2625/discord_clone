@@ -160,4 +160,42 @@ exports.uploadGroupDMFile = async (req, res) => {
     console.error('Error uploading file to group DM:', err);
     res.status(500).json({ error: 'Failed to upload file' });
   }
+};
+
+// Leave group DM
+exports.leaveGroupDM = async (req, res) => {
+  try {
+    const groupDmId = parseInt(req.params.id, 10);
+    const userId = req.user.id;
+
+    // Check if user is a member of the group DM
+    const membership = await db.select().from(groupDMMembers)
+      .where(eq(groupDMMembers.groupDmId, groupDmId))
+      .where(eq(groupDMMembers.userId, userId));
+
+    if (membership.length === 0) {
+      return res.status(404).json({ error: 'You are not a member of this group DM' });
+    }
+
+    // Remove user from group DM
+    await db.delete(groupDMMembers)
+      .where(eq(groupDMMembers.groupDmId, groupDmId))
+      .where(eq(groupDMMembers.userId, userId));
+
+    // Check if group DM has any remaining members
+    const remainingMembers = await db.select().from(groupDMMembers)
+      .where(eq(groupDMMembers.groupDmId, groupDmId));
+
+    // If no members left, delete the group DM session
+    if (remainingMembers.length === 0) {
+      await db.delete(groupDMSessions).where(eq(groupDMSessions.id, groupDmId));
+      await db.delete(groupDMMessages).where(eq(groupDMMessages.groupDmId, groupDmId));
+      await db.delete(groupDMAttachments).where(eq(groupDMAttachments.groupDmId, groupDmId));
+    }
+
+    res.json({ message: 'Successfully left the group DM' });
+  } catch (err) {
+    console.error('Error leaving group DM:', err);
+    res.status(500).json({ error: 'Failed to leave group DM' });
+  }
 }; 
