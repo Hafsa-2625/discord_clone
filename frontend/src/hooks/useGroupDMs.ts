@@ -13,7 +13,8 @@ export function useGroupDMs(user: any) {
     if (user.id) {
       fetch(`${API_URL}/api/group-dms/user/${user.id}`)
         .then(res => res.json())
-        .then(data => setGroupDMs(data.groupDMs || []));
+        .then(data => setGroupDMs(data.groupDMs || []))
+        .catch(err => console.error('Error fetching group DMs:', err));
     }
   }, [user.id]);
 

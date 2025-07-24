@@ -4,11 +4,12 @@ interface AddFriendProps {
   friendUsername: string;
   setFriendUsername: (v: string) => void;
   addFriendStatus: string;
-  loading: boolean;
   handleSendFriendRequest: (e: React.FormEvent) => void;
 }
 
-export default function AddFriend({ friendUsername, setFriendUsername, addFriendStatus, loading, handleSendFriendRequest }: AddFriendProps) {
+export default function AddFriend({ friendUsername, setFriendUsername, addFriendStatus, handleSendFriendRequest }: AddFriendProps) {
+  const isLoading = addFriendStatus === "Sending friend request...";
+  
   return (
     <div className="flex flex-col md:flex-row items-start gap-8 p-8">
       <div className="flex-1">
@@ -23,8 +24,8 @@ export default function AddFriend({ friendUsername, setFriendUsername, addFriend
             onChange={e => setFriendUsername(e.target.value)}
             required
           />
-          <Button type="submit" className="rounded-lg h-full px-4 bg-[#5865f2] text-white font-bold" disabled={loading}>
-            {loading ? "Sending..." : "Send Request"}
+          <Button type="submit" className="rounded-lg h-full px-4 bg-[#5865f2] text-white font-bold" disabled={isLoading}>
+            {isLoading ? "Sending..." : "Send Request"}
           </Button>
         </form>
         {addFriendStatus && <div className="mt-4 text-sm text-center text-blue-400">{addFriendStatus}</div>}

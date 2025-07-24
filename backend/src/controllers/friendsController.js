@@ -25,6 +25,7 @@ exports.getFriendRequests = async (req, res) => {
       id: reqq.id,
       senderId: reqq.senderId,
       senderName: sender[0]?.name || '',
+      senderProfilePicture: sender[0]?.profilePicture || null,
       createdAt: reqq.createdAt,
     };
   }));
@@ -62,6 +63,7 @@ exports.getFriends = async (req, res) => {
   const result = friendUsers.map(u => ({
     id: u.id,
     name: u.name,
+    profilePicture: u.profilePicture || null,
     status: 'offline',
     createdAt: u.createdAt,
   }));

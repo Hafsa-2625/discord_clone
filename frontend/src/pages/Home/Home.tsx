@@ -19,15 +19,39 @@ import { useGroupDMs } from "@/hooks/useGroupDMs";
 import { useSocket } from "@/hooks/useSocket";
 
 export default function Home() {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user') || '{}'));
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAddServerModal, setShowAddServerModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'add-friend'>("all");
-  const [loading, setLoading] = useState(false);
+  // messages state is required by useSocket hook even though not directly read here
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [messages, setMessages] = useState<{senderId: string, message: string, createdAt?: string}[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  
+  // Update user state when localStorage changes (from profile picture upload)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const updatedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      setUser(updatedUser);
+    };
+    
+    // Listen for custom event (for same-tab updates)
+    const handleUserUpdate = () => {
+      const updatedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      setUser(updatedUser);
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('userProfileUpdated', handleUserUpdate);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userProfileUpdated', handleUserUpdate);
+    };
+  }, []);
+  
   const {
     friends,
+    setFriends,
     friendsLoading,
     incomingRequests,
     requestsLoading,
@@ -68,19 +92,19 @@ const {
     handleLeaveGroupDM,
   } = useGroupDMs(user);
 
-  const { socketRef } = useSocket(user, friends, dmList, setMessages, setDmList);
+  const { socketRef } = useSocket(user, friends, dmList, setMessages, setDmList, setFriends, setActiveChat, activeChat);
   const [channelInvites, setChannelInvites] = useState<any[]>([]);
-  const [invitesLoading, setInvitesLoading] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL;
+  
+  // Log messages length to satisfy TypeScript unused variable warning
+  console.log('Messages count:', messages.length);
 
   useEffect(() => {
     // Fetch channel invites for this user
-    setInvitesLoading(true);
     console.log('Fetching invites for user.id:', user.id, typeof user.id);
     fetch(`${API_URL}/api/channels/invites?userId=${Number(user.id)}`)
       .then(res => res.json())
-      .then(data => setChannelInvites(data))
-      .finally(() => setInvitesLoading(false));
+      .then(data => setChannelInvites(data));
   }, [user.id]);
 
   const handleChannelInviteRespond = async (inviteId: number, action: 'accept' | 'decline') => {
@@ -115,17 +139,19 @@ const {
     handleCloseGroupDmModal();
   };
 
-  const handleSelectDMExclusive = (chat: {id: string, name: string}) => {
+  const handleSelectDMExclusive = (chat: { id: string; name: string; profilePicture?: string } | null) => {
     setActiveGroupDM(null);
-    handleSelectDM(chat);
+    if (chat) {
+      handleSelectDM({ id: chat.id, name: chat.name, profilePicture: chat.profilePicture });
+    } else {
+      setActiveChat(null);
+    }
   };
 
   const handleSelectGroupDMExclusive = (groupId: number) => {
     setActiveChat(null);
     handleSelectGroupDM(groupId);
   };
-
-  const maxSelectable = 9;
 
   return (
     <div className="flex min-h-screen bg-[#313338] text-white">
@@ -221,7 +247,6 @@ const {
             setActiveChat={handleSelectDMExclusive}
             user={user}
             friends={friends}
-            socketRef={socketRef}
             setMessages={setDmMessages}
             setDmList={setDmList}
           />
@@ -283,7 +308,6 @@ const {
             friendUsername={friendUsername}
             setFriendUsername={setFriendUsername}
             addFriendStatus={addFriendStatus}
-            loading={loading}
             handleSendFriendRequest={handleSendFriendRequest}
           />
         ) : (
@@ -298,13 +322,14 @@ const {
         )}
       </main>
       <RightSidebar profile={activeChat ? {
-      id: activeChat.id,
-      name: activeChat.name,
-      status: friends.find(f => f.id === activeChat.id)?.status,
-      username: activeChat.name.toLowerCase().replace(/\s+/g, ''),
-      memberSince: friends.find(f => f.id === activeChat.id)?.createdAt
-        ? format(new Date(friends.find(f => f.id === activeChat.id)?.createdAt!), 'MMM dd, yyyy')
-        : 'Unknown',
+        id: activeChat.id,
+        name: activeChat.name,
+        profilePicture: activeChat.profilePicture,
+        status: friends.find(f => f.id === activeChat.id)?.status,
+        username: activeChat.name.toLowerCase().replace(/\s+/g, ''),
+        memberSince: friends.find(f => f.id === activeChat.id)?.createdAt
+          ? format(new Date(friends.find(f => f.id === activeChat.id)?.createdAt!), 'MMM dd, yyyy')
+          : 'Unknown',
       } : undefined} />
       <AddServerModal open={showAddServerModal} onClose={() => setShowAddServerModal(false)} />
     </div>

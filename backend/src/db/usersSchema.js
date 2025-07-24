@@ -5,6 +5,7 @@ const users = pgTable('users', {
   name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   password: varchar('password', { length: 255 }).notNull(),
+  profilePicture: varchar('profile_picture', { length: 500 }), // URL to profile picture
   createdAt: timestamp('created_at').defaultNow(),
 });
 

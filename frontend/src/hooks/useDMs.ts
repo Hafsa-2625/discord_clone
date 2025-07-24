@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 
-export function useDMs(user: any, friends: {id: string, name: string}[]) {
-  const [dmList, setDmList] = useState<{id: string, name: string}[]>([]);
-  const [activeChat, setActiveChat] = useState<{id: string, name: string} | null>(null);
+export function useDMs(user: any, friends: {id: string, name: string, profilePicture?: string}[]) {
+  const [dmList, setDmList] = useState<{id: string, name: string, profilePicture?: string}[]>([]);
+  const [activeChat, setActiveChat] = useState<{id: string, name: string, profilePicture?: string} | null>(null);
   const [dmMessages, setDmMessages] = useState<{senderId: string, message: string, createdAt?: string}[]>([]);
   const [dmNewMessage, setDmNewMessage] = useState('');
   const API_URL = import.meta.env.VITE_API_URL;
@@ -16,15 +16,15 @@ export function useDMs(user: any, friends: {id: string, name: string}[]) {
           const dms = sessions.map(session => {
             const friendId = session.user1Id == user.id ? session.user2Id : session.user1Id;
             const friend = friends.find(f => f.id == friendId.toString());
-            return friend ? { id: friend.id, name: friend.name } : null;
-          }).filter(Boolean) as {id: string, name: string}[];
+            return friend ? { id: friend.id, name: friend.name, profilePicture: friend.profilePicture } : null;
+          }).filter(Boolean) as {id: string, name: string, profilePicture?: string}[];
           setDmList(dms);
         });
     }
   }, [user.id, friends]);
 
   // Handler for selecting a DM chat
-  const handleSelectDM = (chat: {id: string, name: string}) => {
+  const handleSelectDM = (chat: {id: string, name: string, profilePicture?: string}) => {
     setActiveChat(chat);
     // Fetch messages for this DM session if needed
     // (You can expand this logic as needed)

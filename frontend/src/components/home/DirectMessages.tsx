@@ -1,23 +1,23 @@
 import React, { useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ProfilePicture from "@/components/ui/ProfilePicture";
 
 interface DirectMessagesProps {
-  dmList: { id: string, name: string }[];
-  setActiveChat: (friend: { id: string, name: string }) => void;
-  user: { id: string };
-  friends: { id: string, name: string, status: string }[];
-  socketRef: React.MutableRefObject<any>;
+  dmList: { id: string, name: string, profilePicture?: string }[];
+  setActiveChat: (chat: { id: string, name: string, profilePicture?: string } | null) => void;
+  user: { id: string, name: string, profilePicture?: string };
+  friends: { id: string, name: string, status: string, profilePicture?: string }[];
   setMessages: React.Dispatch<React.SetStateAction<{ senderId: string, message: string, createdAt?: string }[]>>;
-  setDmList: React.Dispatch<React.SetStateAction<{ id: string, name: string }[]>>;
+  setDmList: React.Dispatch<React.SetStateAction<{ id: string, name: string, profilePicture?: string }[]>>;
 }
 
-export default function DirectMessages({ dmList, setActiveChat, user, friends, socketRef, setMessages, setDmList }: DirectMessagesProps) {
+export default function DirectMessages({ dmList, setActiveChat, user, friends, setMessages, setDmList }: DirectMessagesProps) {
   const [showDmModal, setShowDmModal] = useState(false);
   const [dmSearch, setDmSearch] = useState("");
   const filteredFriends = friends.filter(f => f.name.toLowerCase().includes(dmSearch.toLowerCase()));
 
-  const handleStartDm = async (friend: { id: string, name: string }) => {
+  const handleStartDm = async (friend: { id: string, name: string, profilePicture?: string }) => {
     setActiveChat(friend);
     setShowDmModal(false);
     // Add to dmList if not already present
@@ -71,7 +71,11 @@ export default function DirectMessages({ dmList, setActiveChat, user, friends, s
             className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#313338] cursor-pointer"
             onClick={() => handleStartDm(dm)}
           >
-            <img src="/discord.png" alt="avatar" className="w-8 h-8 rounded-full bg-[#5865f2]" />
+            <ProfilePicture 
+              src={dm.profilePicture} 
+              alt={`${dm.name}'s profile`} 
+              size="sm" 
+            />
             <span className="font-bold">{dm.name}</span>
           </div>
         ))}
@@ -100,7 +104,11 @@ export default function DirectMessages({ dmList, setActiveChat, user, friends, s
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#313338] cursor-pointer"
                     onClick={() => handleStartDm(friend)}
                   >
-                    <img src="/discord.png" alt="avatar" className="w-8 h-8 rounded-full bg-[#5865f2]" />
+                    <ProfilePicture 
+                      src={friend.profilePicture} 
+                      alt={`${friend.name}'s profile`} 
+                      size="sm" 
+                    />
                     <span className="font-bold">{friend.name}</span>
                   </div>
                 ))

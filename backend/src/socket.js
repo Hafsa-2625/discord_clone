@@ -126,10 +126,10 @@ io.on('connection', (socket) => {
   });
 
   // Relay offer
-  socket.on('call:offer', ({ to, offer, from, callType }) => {
+  socket.on('call:offer', ({ to, offer, from, callType, callLogId }) => {
     const receiverSocketId = onlineUsers[to];
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit('call:offer', { from, offer, callType });
+      io.to(receiverSocketId).emit('call:offer', { from, offer, callType, callLogId });
     }
   });
 
@@ -173,4 +173,7 @@ io.on('connection', (socket) => {
   });
 });
 
-module.exports = { server }; 
+module.exports = { 
+  server,
+  getIO: () => io
+}; 

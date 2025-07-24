@@ -1,7 +1,7 @@
-import React from "react";
+import ProfilePicture from "@/components/ui/ProfilePicture";
 
 interface FriendsListProps {
-  friends: { id: string, name: string, status: string }[];
+  friends: { id: string, name: string, status: string, profilePicture?: string }[];
   friendsLoading: boolean;
   incomingRequests: any[];
   requestsLoading: boolean;
@@ -19,6 +19,11 @@ export default function FriendsList({ friends, friendsLoading, incomingRequests,
           <div className="font-bold mb-2">Incoming Friend Requests</div>
           {incomingRequests.map(req => (
             <div key={req.id} className="flex items-center gap-4 bg-[#23272a] rounded-lg p-3 mb-2">
+              <ProfilePicture 
+                src={req.senderProfilePicture} 
+                alt={`${req.senderName}'s profile`} 
+                size="sm" 
+              />
               <div className="font-semibold">{req.senderName}</div>
               <button className="bg-green-600 px-3 py-1 rounded text-white" onClick={() => handleRespond(req.id, "accept")}>Accept</button>
               <button className="bg-red-600 px-3 py-1 rounded text-white" onClick={() => handleRespond(req.id, "reject")}>Reject</button>
@@ -34,8 +39,15 @@ export default function FriendsList({ friends, friendsLoading, incomingRequests,
           {friends.map(friend => (
             <div key={friend.id} className="flex items-center justify-between bg-[#23272a] rounded-lg p-3 mb-2">
               <div className="flex items-center gap-4">
-                <div className="font-semibold">{friend.name}</div>
-                <span className="text-xs text-gray-400">{friend.status}</span>
+                <ProfilePicture 
+                  src={friend.profilePicture} 
+                  alt={`${friend.name}'s profile`} 
+                  size="sm" 
+                />
+                <div>
+                  <div className="font-semibold">{friend.name}</div>
+                  <span className="text-xs text-gray-400">{friend.status}</span>
+                </div>
               </div>
               <button 
                 onClick={() => {

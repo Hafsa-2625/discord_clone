@@ -140,6 +140,7 @@ const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
         )}
       </div>
       {callState === 'calling' && <div style={{ color: '#fff', position: 'fixed', top: 32, left: '50%', transform: 'translateX(-50%)', fontSize: 20 }}>Calling...</div>}
+      {callState === 'receiving' && <div style={{ color: '#fff', position: 'fixed', top: 32, left: '50%', transform: 'translateX(-50%)', fontSize: 20 }}>{remoteName} is calling you...</div>}
     </div>
   );
 };

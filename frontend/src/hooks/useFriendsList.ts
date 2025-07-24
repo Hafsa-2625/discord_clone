@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 export function useFriendsList(userId: string, activeTab: 'all' | 'add-friend') {
-  const [friends, setFriends] = useState<{id: string, name: string, status: string, createdAt?: string}[]>([]);
+  const [friends, setFriends] = useState<{id: string, name: string, status: string, profilePicture?: string, createdAt?: string}[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
@@ -116,6 +116,7 @@ export function useFriendsList(userId: string, activeTab: 'all' | 'add-friend') 
 
   return {
     friends,
+    setFriends,
     friendsLoading,
     incomingRequests,
     requestsLoading,

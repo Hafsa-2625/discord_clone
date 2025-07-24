@@ -2,6 +2,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import CallModal from "./CallModal";
 import VideoCallOverlay from "./VideoCallOverlay";
+import ProfilePicture from "@/components/ui/ProfilePicture";
 import { X, Plus, Gift, Image, Smile, Gamepad2, Phone, Video, Paperclip, Upload, BarChart2, Grid } from "lucide-react";
 
 // Voice Call State Types 
@@ -28,15 +29,15 @@ interface ChatMessage {
 }
 
 interface ChatWindowProps {
-  activeChat: { id: string, name: string };
+  activeChat: { id: string, name: string, profilePicture?: string };
   messages: ChatMessage[];
   newMessage: string;
   setNewMessage: (v: string) => void;
-  user: { id: string; name: string };
+  user: { id: string; name: string; profilePicture?: string };
   socketRef: React.MutableRefObject<any>;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
-  dmList: { id: string, name: string }[];
-  setDmList: React.Dispatch<React.SetStateAction<{ id: string, name: string }[]>>;
+  dmList: { id: string, name: string, profilePicture?: string }[];
+  setDmList: React.Dispatch<React.SetStateAction<{ id: string, name: string, profilePicture?: string }[]>>;
   setActiveChat: (v: null) => void;
 }
 
@@ -72,6 +73,7 @@ const remoteVideoRef = useRef<HTMLVideoElement>(null);
   // Voice Call State 
   const [callState, setCallState] = useState<CallState>('idle');
   const [callFrom, setCallFrom] = useState<string | null>(null); // userId of caller
+  const [incomingOffer, setIncomingOffer] = useState<any>(null); // Store incoming offer
   // const [isMuted, setIsMuted] = useState(false);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -109,12 +111,7 @@ const remoteVideoRef = useRef<HTMLVideoElement>(null);
       };
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      socketRef.current.emit('call:offer', {
-        to: activeChat.id,
-        from: user.id,
-        offer,
-        callType: 'audio',
-      });
+      
       // Call log: POST to backend 
       const API_URL = import.meta.env.VITE_API_URL;
       const res = await fetch(`${API_URL}/api/dms/${activeChat.id}/call/start`, {
@@ -124,6 +121,15 @@ const remoteVideoRef = useRef<HTMLVideoElement>(null);
       });
       const data = await res.json();
       setCurrentCallLogId(data.callLog.id);
+      
+      // Include callLogId in the offer so recipient can end the call properly
+      socketRef.current.emit('call:offer', {
+        to: activeChat.id,
+        from: user.id,
+        offer,
+        callType: 'audio',
+        callLogId: data.callLog.id,
+      });
     } catch (err) {
       setCallState('idle');
     }
@@ -175,12 +181,7 @@ const remoteVideoRef = useRef<HTMLVideoElement>(null);
       };
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      socketRef.current.emit('call:offer', {
-        to: activeChat.id,
-        from: user.id,
-        offer,
-        callType: 'video',
-      });
+      
       // Call log: POST to backend 
       const API_URL = import.meta.env.VITE_API_URL;
       const res = await fetch(`${API_URL}/api/dms/${activeChat.id}/call/start`, {
@@ -190,6 +191,15 @@ const remoteVideoRef = useRef<HTMLVideoElement>(null);
       });
       const data = await res.json();
       setCurrentCallLogId(data.callLog.id);
+      
+      // Include callLogId in the offer so recipient can end the call properly
+      socketRef.current.emit('call:offer', {
+        to: activeChat.id,
+        from: user.id,
+        offer,
+        callType: 'video',
+        callLogId: data.callLog.id,
+      });
     } catch (err) {
       setCallState('idle');
     }
@@ -197,6 +207,12 @@ const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
 // Accept Call
 const acceptCall = async () => {
+  if (!incomingOffer || !callFrom) {
+    console.error('No incoming offer or caller information');
+    setCallState('idle');
+    return;
+  }
+
   setCallState('in-call');
   try {
     // Request correct media based on callType
@@ -212,7 +228,8 @@ const acceptCall = async () => {
     
     const pc = new RTCPeerConnection(rtcConfig);
     peerConnectionRef.current = pc;
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    
+    // Set up event handlers
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         socketRef.current.emit('call:ice-candidate', {
@@ -240,8 +257,38 @@ const acceptCall = async () => {
         }
       }
     };
-    // Wait for offer to be set as remote desc in handler below
+
+    // Add local tracks to peer connection
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    
+    // Set remote description (the stored offer)
+    await pc.setRemoteDescription(new RTCSessionDescription(incomingOffer));
+    
+    // Process any queued ICE candidates now that remote description is set
+    for (const candidate of iceCandidateQueue.current) {
+      try {
+        await pc.addIceCandidate(candidate);
+      } catch (err) {
+        // Handle silently or log if needed
+      }
+    }
+    iceCandidateQueue.current = []; // Clear the queue
+    
+    // Create and send answer
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    
+    socketRef.current.emit('call:answer', {
+      to: callFrom,
+      from: user.id,
+      answer
+    });
+
+    // Clear the stored offer
+    setIncomingOffer(null);
+    
   } catch (err) {
+    console.error('Error accepting call:', err);
     setCallState('idle');
   }
 };
@@ -250,6 +297,7 @@ const acceptCall = async () => {
   const endCall = async (shouldNotifyPeer: boolean = true) => {
     setCallState('idle');
     setCallFrom(null);
+    setIncomingOffer(null); // Clear the stored offer
     
     // Clear ICE candidate queue
     iceCandidateQueue.current = [];
@@ -285,9 +333,22 @@ const acceptCall = async () => {
   };
 
   // Decline Call 
-  const declineCall = () => {
+  const declineCall = async () => {
     setCallState('idle');
     setCallFrom(null);
+    setIncomingOffer(null); // Clear the stored offer
+    
+    // End the call log if we have the callLogId
+    if (currentCallLogId) {
+      const API_URL = import.meta.env.VITE_API_URL;
+      await fetch(`${API_URL}/api/dms/${activeChat.id}/call/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callLogId: currentCallLogId }),
+      });
+      setCurrentCallLogId(null);
+    }
+    
     socketRef.current.emit('call:end', {
       to: callFrom,
       from: user.id
@@ -298,97 +359,15 @@ const acceptCall = async () => {
 useEffect(() => {
   if (!socketRef.current) return;
   // Incoming Offer 
-  const handleOffer = async ({ offer, from, callType: incomingCallType }: { offer: any; from: string; callType: 'audio' | 'video' }) => {
+  const handleOffer = async ({ offer, from, callType: incomingCallType, callLogId }: { offer: any; from: string; callType: 'audio' | 'video'; callLogId: string }) => {
     setCallFrom(from);
     setCallType(incomingCallType);
+    setIncomingOffer(offer); // Store the offer for when user accepts
+    setCurrentCallLogId(callLogId); // Store the callLogId so recipient can end the call
     
-    // Set call state FIRST to render VideoCallOverlay and create video elements
-    if (incomingCallType === 'video') {
-      setCallState('calling');
-    } else {
-      setCallState('receiving');
-    }
-    
-    // Wait a brief moment for the VideoCallOverlay to render and video refs to be available
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // 1. Create peer connection
-    const pc = new RTCPeerConnection(rtcConfig);
-    peerConnectionRef.current = pc;
-    
-    // Set up ontrack handler EARLY to catch incoming streams
-    pc.ontrack = (event: RTCTrackEvent) => {
-      if (event.streams && event.streams[0]) {
-        remoteStreamRef.current = event.streams[0];
-        
-        // Always assign remote video for video calls
-        if (incomingCallType === 'video' && remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        } else if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = event.streams[0];
-        }
-      }
-    };
-    // 2. Get local stream and add tracks
-    let localStream = localStreamRef.current;
-    if (!localStream) {
-      try {
-        const constraints = incomingCallType === 'video' ? { audio: true, video: true } : { audio: true };
-        localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        localStreamRef.current = localStream;
-        // Always assign local video for video calls
-        if (incomingCallType === 'video' && localVideoRef.current) {
-          localVideoRef.current.srcObject = localStream;
-        }
-      } catch (err) {
-        return;
-      }
-    }
-    // Always add all tracks to peer connection
-    localStream.getTracks().forEach(track => {
-      pc.addTrack(track, localStream!);
-    });
-    
-    // 4. Set remote description (offer)
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    
-    // Process any queued ICE candidates now that remote description is set
-    for (const candidate of iceCandidateQueue.current) {
-      try {
-        await pc.addIceCandidate(candidate);
-      } catch (err) {
-        // Handle silently or log if needed
-      }
-    }
-    iceCandidateQueue.current = []; // Clear the queue
-    
-    // 5. Create and set local answer
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    
-    // 6. Send answer
-    socketRef.current.emit('call:answer', {
-      to: from,
-      from: user.id,
-      answer
-    });
-    
-    // ICE candidate handler
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socketRef.current.emit('call:ice-candidate', {
-          to: from,
-          from: user.id,
-          candidate: event.candidate
-        });
-      }
-    };
-    pc.oniceconnectionstatechange = () => {
-      // Connection state monitoring
-    };
-    pc.onsignalingstatechange = () => {
-      // Signaling state monitoring
-    };
+    // Set call state to 'receiving' for both audio and video calls
+    // so that the user gets the option to accept or decline
+    setCallState('receiving');
   };
     // Incoming Answer 
     const handleAnswer = async ({ answer }: { answer: any }) => {
@@ -561,6 +540,8 @@ useEffect(() => {
           remoteVideoRef={remoteVideoRef}
           onEnd={endCall}
           callState={callState}
+          onAccept={acceptCall}
+          onDecline={declineCall}
           remoteName={activeChat.name}
           localName={user.name}
         />
@@ -578,7 +559,12 @@ useEffect(() => {
       {callState === 'idle' && (
         <>
       <div className="flex items-center px-6 py-4 border-b border-[#23272a] bg-[#313338]">
-        <img src="/discord.png" alt="avatar" className="w-8 h-8 rounded-full bg-[#5865f2] mr-3" />
+        <ProfilePicture 
+          src={activeChat.profilePicture} 
+          alt={`${activeChat.name}'s profile`} 
+          size="sm" 
+          className="mr-3" 
+        />
         <span className="font-bold text-lg">{activeChat.name}</span>
         <div className="flex gap-2 ml-auto">
           {/* --- Voice Call Button --- */}
@@ -609,22 +595,38 @@ useEffect(() => {
         {[...messages].reverse().map((msg, idx) => (
           <div
             key={idx}
-            className={`flex ${msg.senderId == user.id ? 'justify-end' : 'justify-start'}`}
+            className={`flex gap-3 ${msg.senderId == user.id ? 'justify-end' : 'justify-start'}`}
           >
-            {msg.call ? (
-              <div className="flex items-center gap-2 text-xs text-green-400 bg-[#23272a] rounded-lg px-3 py-2">
-                {msg.call?.callType === 'video' ? <Video size={16} /> : <Phone size={16} />}
-                {msg.senderId == user.id ? 'You' : activeChat.name} started a {msg.call?.callType === 'video' ? 'video' : 'voice'} call{msg.call.endedAt ? ' that lasted a few seconds.' : '...' }
-              </div>
-            ) : msg.file ? (
-              <div className="bg-[#23272a] rounded-lg p-4 max-w-xs">
-                {isImageFile(msg.file.type) ? (
-                  <img src={msg.file.url} alt={msg.file.name} className="rounded mb-2 max-w-full max-h-48" />
-                ) : null}
-                <a href={msg.file.url} target="_blank" rel="noopener noreferrer" className="block text-white text-sm mt-1">{msg.file.name}</a>
-              </div>
-            ) : (
-              <div className={`px-4 py-2 rounded-lg ${msg.senderId == user.id ? 'bg-[#5865f2] text-white' : 'bg-[#23272a] text-gray-200'}`}>{msg.message}</div>
+            {msg.senderId != user.id && (
+              <ProfilePicture 
+                src={activeChat.profilePicture} 
+                alt={`${activeChat.name}'s profile`} 
+                size="sm" 
+              />
+            )}
+            <div className="flex flex-col">
+              {msg.call ? (
+                <div className="flex items-center gap-2 text-xs text-green-400 bg-[#23272a] rounded-lg px-3 py-2">
+                  {msg.call?.callType === 'video' ? <Video size={16} /> : <Phone size={16} />}
+                  {msg.senderId == user.id ? 'You' : activeChat.name} started a {msg.call?.callType === 'video' ? 'video' : 'voice'} call{msg.call.endedAt ? ' that lasted a few seconds.' : '...' }
+                </div>
+              ) : msg.file ? (
+                <div className="bg-[#23272a] rounded-lg p-4 max-w-xs">
+                  {isImageFile(msg.file.type) ? (
+                    <img src={msg.file.url} alt={msg.file.name} className="rounded mb-2 max-w-full max-h-48" />
+                  ) : null}
+                  <a href={msg.file.url} target="_blank" rel="noopener noreferrer" className="block text-white text-sm mt-1">{msg.file.name}</a>
+                </div>
+              ) : (
+                <div className={`px-4 py-2 rounded-lg ${msg.senderId == user.id ? 'bg-[#5865f2] text-white' : 'bg-[#23272a] text-gray-200'}`}>{msg.message}</div>
+              )}
+            </div>
+            {msg.senderId == user.id && (
+              <ProfilePicture 
+                src={user.profilePicture} 
+                alt={`${user.name}'s profile`} 
+                size="sm" 
+              />
             )}
           </div>
         ))}

@@ -1,4 +1,4 @@
-import React from "react";
+import ProfilePicture from "@/components/ui/ProfilePicture";
 
 interface ProfileProps {
   id: string;
@@ -6,6 +6,7 @@ interface ProfileProps {
   status?: string;
   username?: string;
   memberSince?: string;
+  profilePicture?: string;
 }
 
 export default function RightSidebar({ profile }: { profile?: ProfileProps }) {
@@ -13,7 +14,13 @@ export default function RightSidebar({ profile }: { profile?: ProfileProps }) {
     return (
       <aside className="w-80 bg-[#23272a] border-l border-[#23272a] p-6 flex flex-col items-center">
         <div className="w-full bg-[#5865f2] rounded-t-lg h-32 flex flex-col items-center justify-end relative">
-          <img src="/discord.png" alt="avatar" className="w-24 h-24 rounded-full bg-[#5865f2] border-4 border-[#23272a] absolute left-1/2 -bottom-12 -translate-x-1/2" />
+          <div className="absolute left-1/2 -bottom-12 -translate-x-1/2 border-4 border-[#23272a] rounded-full">
+            <ProfilePicture 
+              src={profile.profilePicture} 
+              alt={`${profile.name}'s profile`} 
+              size="lg" 
+            />
+          </div>
         </div>
         <div className="mt-16 w-full flex flex-col items-center">
           <div className="flex items-center gap-2">
